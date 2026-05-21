@@ -1,37 +1,43 @@
 :root {
   color-scheme: light;
-  --bg-top: #f4efe6;
-  --bg-bottom: #d8e7da;
-  --panel: rgba(255, 252, 246, 0.88);
+  --panel: rgba(251, 248, 241, 0.84);
   --text: #1b2a21;
-  --muted: #52675a;
+  --muted: rgba(27, 42, 33, 0.72);
   --accent: #2f7d4b;
-  --border: rgba(47, 125, 75, 0.18);
-  --shadow: 0 24px 60px rgba(27, 42, 33, 0.12);
+  --border: rgba(255, 255, 255, 0.24);
+  --shadow: 0 24px 60px rgba(14, 25, 19, 0.2);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100%;
   font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.55), transparent 30%),
-    linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+  background: #d8e7da;
 }
 
 .page {
-  width: min(1100px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 40px 0 56px;
+  position: relative;
+  min-height: 100vh;
 }
 
 .hero {
-  margin-bottom: 24px;
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 500;
+  width: min(460px, calc(100% - 48px));
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
 }
 
 .eyebrow {
@@ -50,47 +56,35 @@ h1 {
 }
 
 .description {
-  max-width: 42rem;
   margin: 16px 0 0;
   color: var(--muted);
   font-size: 1rem;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 .map-card {
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 28px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
+  min-height: 100vh;
 }
 
 #map {
   width: 100%;
-  height: min(72vh, 680px);
-  min-height: 420px;
-  border-radius: 20px;
-  overflow: hidden;
+  height: 100vh;
 }
 
 @media (max-width: 640px) {
-  .page {
-    width: min(100% - 20px, 1100px);
-    padding: 24px 0 32px;
+  .hero {
+    top: 16px;
+    left: 16px;
+    width: calc(100% - 32px);
+    padding: 16px 18px;
+    border-radius: 18px;
   }
 
   .description {
     font-size: 0.95rem;
   }
 
-  .map-card {
-    padding: 10px;
-    border-radius: 20px;
-  }
-
-  #map {
-    min-height: 360px;
-    border-radius: 14px;
+  h1 {
+    font-size: clamp(1.8rem, 10vw, 3rem);
   }
 }
