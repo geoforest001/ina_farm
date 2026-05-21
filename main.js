@@ -44,7 +44,8 @@ L.control
     },
     {},
     {
-      position: "topright"
+      position: "topright",
+      collapsed: false
     }
   )
   .addTo(map);
