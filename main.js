@@ -1,5 +1,5 @@
-const fallbackLocation = [35.681236, 139.767125];
-const fallbackZoom = 13;
+const fallbackLocation = [36.648526, 138.194243];
+const fallbackZoom = 11;
 const currentLocationZoom = 15;
 const gsiAttribution =
   '<a href="https://maps.gsi.go.jp/development/ichiran.html">地理院タイル</a>';
@@ -51,7 +51,7 @@ L.control
 
 const marker = L.marker(fallbackLocation)
   .addTo(map)
-  .bindPopup("東京駅")
+  .bindPopup("長野市")
   .openPopup();
 
 if (navigator.geolocation) {
