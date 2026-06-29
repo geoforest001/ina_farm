@@ -72,6 +72,42 @@ const pipelineTiles = protomapsL.leafletLayer({
 });
 pipelineTiles.addTo(map);
 
+const SURVEY_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%9E%E3%83%B3%E3%83%9B%E3%83%BC%E3%83%AB.pmtiles";
+
+const surveyTiles = protomapsL.leafletLayer({
+  url: SURVEY_URL,
+  maxDataZoom: 15,
+  paintRules: [
+    {
+      dataLayer: "02調査結果 R6",
+      filter: (zoom, feature) => feature.props["結合用_表示"] === "発見",
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(240,200,0)", opacity: 1 })
+    },
+    {
+      dataLayer: "02調査結果 R6",
+      filter: (zoom, feature) => feature.props["結合用_表示"] === "不明",
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(220,120,0)", opacity: 1 })
+    },
+    {
+      dataLayer: "02調査結果 R6",
+      filter: (zoom, feature) => feature.props["結合用_表示"] === "未",
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(180,180,180)", opacity: 1 })
+    },
+    {
+      dataLayer: "02調査結果 R6",
+      filter: (zoom, feature) => feature.props["結合用_表示"] === "GF",
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(150,50,180)", opacity: 1 })
+    },
+    {
+      dataLayer: "02調査結果 R6",
+      filter: (zoom, feature) => feature.props["結合用_表示"] === "新",
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(220,20,20)", opacity: 1 })
+    }
+  ],
+  labelRules: []
+});
+surveyTiles.addTo(map);
+
 const baseLayers = {
   "地理院標準地図": gsiStandard,
   "地理院航空写真": gsiAirPhoto,
@@ -80,7 +116,8 @@ const baseLayers = {
 
 const overlays = {
   "農地筆ポリゴン": farmPolygonTiles,
-  "パイプライン": pipelineTiles
+  "パイプライン": pipelineTiles,
+  "マンホール": surveyTiles
 };
 
 let layerControl;
