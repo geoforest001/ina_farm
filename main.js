@@ -56,7 +56,7 @@ farmPolygonTiles.addTo(map);
 
 const pipelineTiles = protomapsL.leafletLayer({
   url: PIPELINE_URL,
-  maxDataZoom: 13,
+  maxDataZoom: 15,
   paintRules: [
     {
       dataLayer: "02パイプライン_Layer",
