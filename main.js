@@ -81,27 +81,27 @@ const surveyTiles = protomapsL.leafletLayer({
     {
       dataLayer: "02調査結果 R6",
       filter: (zoom, feature) => feature.props["結合用_表示"] === "発見",
-      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(240,200,0)", opacity: 1 })
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 3, fill: "rgb(240,200,0)", opacity: 1, stroke: "black", width: 1 })
     },
     {
       dataLayer: "02調査結果 R6",
       filter: (zoom, feature) => feature.props["結合用_表示"] === "不明",
-      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(220,120,0)", opacity: 1 })
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 3, fill: "rgb(220,120,0)", opacity: 1, stroke: "black", width: 1 })
     },
     {
       dataLayer: "02調査結果 R6",
       filter: (zoom, feature) => feature.props["結合用_表示"] === "未",
-      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(180,180,180)", opacity: 1 })
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 3, fill: "rgb(180,180,180)", opacity: 1, stroke: "black", width: 1 })
     },
     {
       dataLayer: "02調査結果 R6",
       filter: (zoom, feature) => feature.props["結合用_表示"] === "GF",
-      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(150,50,180)", opacity: 1 })
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 3, fill: "rgb(150,50,180)", opacity: 1, stroke: "black", width: 1 })
     },
     {
       dataLayer: "02調査結果 R6",
       filter: (zoom, feature) => feature.props["結合用_表示"] === "新",
-      symbolizer: new protomapsL.CircleSymbolizer({ radius: 4, fill: "rgb(220,20,20)", opacity: 1 })
+      symbolizer: new protomapsL.CircleSymbolizer({ radius: 3, fill: "rgb(220,20,20)", opacity: 1, stroke: "black", width: 1 })
     }
   ],
   labelRules: []
