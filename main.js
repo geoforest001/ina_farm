@@ -72,6 +72,24 @@ const pipelineTiles = protomapsL.leafletLayer({
 });
 pipelineTiles.addTo(map);
 
+const WATERWAY_URL = "https://geoforest001.github.io/ina_farm_test/data/%E6%B0%B4%E8%B7%AF.pmtiles";
+
+const waterwayTiles = protomapsL.leafletLayer({
+  url: WATERWAY_URL,
+  maxDataZoom: 15,
+  paintRules: [
+    {
+      dataLayer: "水路",
+      symbolizer: new protomapsL.LineSymbolizer({
+        color: "rgb(0,150,255)",
+        width: 2
+      })
+    }
+  ],
+  labelRules: []
+});
+waterwayTiles.addTo(map);
+
 const SURVEY_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%9E%E3%83%B3%E3%83%9B%E3%83%BC%E3%83%AB.pmtiles";
 
 const surveyTiles = protomapsL.leafletLayer({
@@ -117,6 +135,7 @@ const baseLayers = {
 const overlays = {
   "農地筆ポリゴン": farmPolygonTiles,
   "パイプライン": pipelineTiles,
+  "水路": waterwayTiles,
   "マンホール": surveyTiles
 };
 
