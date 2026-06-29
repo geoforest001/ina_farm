@@ -46,9 +46,9 @@ const farmPolygonTiles = protomapsL.leafletLayer({
     {
       dataLayer: "農地筆ポリゴン2025",
       symbolizer: new protomapsL.PolygonSymbolizer({
-        fill: "rgb(0,180,0)",
-        opacity: 0.5,
-        stroke: "rgb(0,100,0)",
+        fill: "rgb(240,210,0)",
+        opacity: 0.3,
+        stroke: "rgb(160,130,0)",
         width: 1.5
       })
     }
