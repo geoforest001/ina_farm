@@ -1,5 +1,5 @@
 /* ============================================================
-   weather.js  — 気象情報ダッシュボード (geoforest001/map)
+   weather.js  — 気象情報ダッシュボード + 気象レイヤ (geoforest001/map)
    気象庁 API + AMeDAS  ©  akahanenoriaki
    ============================================================ */
 
@@ -29,6 +29,18 @@ const AM_CHART_VARS = {
   snow:    {field:'snow',            agg:'last',   idx:0,col:'rgba(150,200,255,0.7)',type:'bar',files:8},
 };
 
+/* 気象レイヤ定義 */
+const WX_LAYER_DEFS = {
+  rain:  {type:'nowc', zoom:10, tf:['targetTimes_N1.json'], url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`},
+  land:  {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/land/{z}/{x}/{y}.png`},
+  flood: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/inund/{z}/{x}/{y}.png`},
+  river: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/flood/{z}/{x}/{y}.png`},
+};
+const wxLayerState = {};
+Object.keys(WX_LAYER_DEFS).forEach(k => { wxLayerState[k] = {on:false, layer:null, timer:null, errCount:0}; });
+const WX_CHK_MAP = {rain:'chkLRain', land:'chkLLand', flood:'chkLFlood', river:'chkLRiver'};
+const WX_LBL_MAP = {rain:'lblLRain', land:'lblLLand', flood:'lblLFlood', river:'lblLRiver'};
+
 let _jmaForecast = null;
 let _amedasCurrentTemp = null, _amedasCurrentTime = null;
 let _amedasTable = null;
@@ -38,6 +50,7 @@ let wxOpen = false;
 let _cwCounter = 0;
 const _charts = new Map();
 let _activeChartId = null, _sheetChart = null;
+let amedasOn = false, amedasMarkers = [], amedasTimer = null;
 
 /* ─── ユーティリティ ─────────────────────────── */
 function jmaCodeIcon(code) {
@@ -50,6 +63,32 @@ function jmaCodeIcon(code) {
   if (n >= 600 && n < 700) return '🌧';
   if (n >= 700 && n < 800) return '🌨';
   return '🌡';
+}
+
+function jmaTime(intervalMin = 5, lagMin = 5) {
+  const now = new Date(), jst = new Date(now.getTime() + 9 * 3600000);
+  const total = jst.getUTCHours() * 60 + jst.getUTCMinutes();
+  const floored = Math.floor(total / intervalMin) * intervalMin - lagMin;
+  const d = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate(), 0, floored, 0));
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth()+1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}00`;
+}
+
+async function getJmaValidTime(type, candidates) {
+  for (const file of (candidates || ['targetTimes_N1.json'])) {
+    try {
+      const res = await fetch(`https://www.jma.go.jp/bosai/jmatile/data/${type}/${file}`, {cache:'no-store'});
+      if (!res.ok) continue;
+      const arr = await res.json();
+      if (!Array.isArray(arr) || !arr.length) continue;
+      const last = arr[arr.length - 1];
+      if (typeof last === 'string') return {basetime: last, validtime: last};
+      const bt = last.basetime || last.time || '';
+      const vt = last.validtime || bt;
+      if (bt) return {basetime: bt, validtime: vt};
+    } catch(e) {}
+  }
+  return null;
 }
 
 async function getJMAAreaCode(lat, lng) {
@@ -96,9 +135,88 @@ function _prependCurrent(labels, data) {
   return { labels: [`現在\n${p(now.getHours())}:${p(now.getMinutes())}`, ...labels], data: [_amedasCurrentTemp, ...data] };
 }
 
+/* ─── 気象タイルレイヤ ───────────────────────── */
+async function wxUpdateLayer(key) {
+  const def = WX_LAYER_DEFS[key], st = wxLayerState[key];
+  if (!st.on) return;
+  const times = await getJmaValidTime(def.type, def.tf);
+  const t = jmaTime(5, 10);
+  const urlTpl = times ? def.url(times.basetime, times.validtime) : def.url(t, t);
+  if (st.layer) map.removeLayer(st.layer);
+  st.errCount = 0;
+  const lbl = document.getElementById(WX_LBL_MAP[key]);
+  const lyr = L.tileLayer(urlTpl, {opacity:0.6, maxNativeZoom:def.zoom, maxZoom:22, attribution:'© 気象庁'});
+  lyr.on('tileerror', () => {
+    st.errCount++;
+    if (st.errCount === 3 && lbl) lbl.style.borderColor = '#ff3b30';
+  });
+  lyr.on('tileload', () => { st.errCount = 0; if (lbl) lbl.style.borderColor = ''; });
+  st.layer = lyr.addTo(map);
+}
+
+async function wxApplyLayerState(key) {
+  const st = wxLayerState[key];
+  const lbl = document.getElementById(WX_LBL_MAP[key]);
+  if (lbl) lbl.classList.toggle('active', st.on);
+  if (st.on) {
+    await wxUpdateLayer(key);
+    if (!st.timer) st.timer = setInterval(() => wxUpdateLayer(key), 5 * 60 * 1000);
+  } else {
+    clearInterval(st.timer); st.timer = null;
+    if (st.layer) { map.removeLayer(st.layer); st.layer = null; }
+  }
+}
+
+/* ─── AMeDASマーカーレイヤ ──────────────────── */
+async function fetchAmedasMarkers() {
+  try {
+    const timeRes = await fetch('https://www.jma.go.jp/bosai/amedas/data/latest_time.txt');
+    if (!timeRes.ok) throw new Error(`latest_time HTTP ${timeRes.status}`);
+    const rawTime = (await timeRes.text()).trim();
+    const m = rawTime.match(/(\d{4})\D(\d{2})\D(\d{2})\D(\d{2}):(\d{2}):(\d{2})/);
+    if (!m) throw new Error('time parse failed');
+    const timeStr = `${m[1]}${m[2]}${m[3]}${m[4]}${m[5]}${m[6]}`;
+    if (!_amedasTable) {
+      const tRes = await fetch('https://www.jma.go.jp/bosai/amedas/const/amedastable.json');
+      if (!tRes.ok) throw new Error(`amedastable HTTP ${tRes.status}`);
+      _amedasTable = await tRes.json();
+    }
+    const dataRes = await fetch(`https://www.jma.go.jp/bosai/amedas/data/map/${timeStr}.json`);
+    if (!dataRes.ok) throw new Error(`map data HTTP ${dataRes.status}`);
+    const data = await dataRes.json();
+    amedasMarkers.forEach(mk => map.removeLayer(mk)); amedasMarkers = [];
+    const center = map.getCenter();
+    const stations = Object.entries(data).map(([code, d]) => {
+      const info = _amedasTable[code];
+      if (!info || !info.lat || !info.lon || !Array.isArray(info.lat)) return null;
+      const lat = info.lat[0] + info.lat[1] / 60, lng = info.lon[0] + info.lon[1] / 60;
+      if (isNaN(lat) || isNaN(lng)) return null;
+      return {code, info, d, lat, lng, dist: map.distance(center, L.latLng(lat, lng))};
+    }).filter(s => s && s.dist < 60000).sort((a, b) => a.dist - b.dist).slice(0, 20);
+    stations.forEach(s => {
+      const tv = s.d.temp ? s.d.temp[0] : null;
+      const temp = tv !== null ? `${tv}°C` : '--';
+      const rain = s.d.precipitation1h ? `${s.d.precipitation1h[0]}mm/h` : (s.d.precipitation10m ? `${s.d.precipitation10m[0]}mm/10m` : '--');
+      const wind = s.d.wind ? `${s.d.wind[0]}m/s` : '--';
+      const col = tv === null ? '#888' : tv >= 30 ? '#c62828' : tv >= 25 ? '#e65100' : tv >= 15 ? '#1565c0' : tv >= 5 ? '#0277bd' : '#4a148c';
+      const mk = L.marker([s.lat, s.lng], {
+        icon: L.divIcon({
+          html: `<div style="background:#fff;color:${col};border:2px solid ${col};border-radius:6px;padding:2px 7px;font-size:13px;font-family:sans-serif;font-weight:bold;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25)">${temp}</div>`,
+          className: '', iconAnchor: [22, 12]
+        })
+      }).addTo(map);
+      mk.bindPopup(`<div style="font-size:12px;font-family:sans-serif"><b>📡 ${s.info.kjName || s.code}</b><br>🌡 ${temp}　🌧 ${rain}　💨 ${wind}</div>`);
+      amedasMarkers.push(mk);
+    });
+    document.getElementById('lblLAmedas').style.borderColor = '';
+  } catch(e) {
+    console.error('[AMeDAS marker]', e);
+    document.getElementById('lblLAmedas').style.borderColor = '#ff3b30';
+  }
+}
+
 /* ─── 予報取得 ───────────────────────────────── */
 async function fetchWeather(lat, lng) {
-  const wxPanel = document.getElementById('wxPanel');
   document.getElementById('wxLoading').style.display = 'block';
   document.getElementById('wxLoading').textContent = '取得中...';
   document.getElementById('wxContent').style.display = 'none';
@@ -125,8 +243,6 @@ async function fetchWeather(lat, lng) {
     document.getElementById('wxRain').textContent = maxPop >= 0 ? `${maxPop}%` : '--';
     document.getElementById('wxWind').textContent = todayMax ? `${todayMax}°C` : '--';
     document.getElementById('wxHumid').textContent = todayMin ? `${todayMin}°C` : '--';
-    const _lbl = document.getElementById('wxCellHumid').querySelector('.lbl');
-    if (_lbl) _lbl.textContent = '🌡 最低気温';
     /* 3日間カード */
     const dayCards = document.getElementById('wxDayCards'); dayCards.innerHTML = '';
     ['今日', '明日', '明後日'].forEach((name, i) => {
@@ -166,7 +282,7 @@ async function fetchWeather(lat, lng) {
   }
 }
 
-/* ─── AMeDAS ─────────────────────────────────── */
+/* ─── AMeDAS最寄り ───────────────────────────── */
 async function fetchAmedasForLocation(lat, lng) {
   document.getElementById('wxAmedasLoading').style.display = 'block';
   document.getElementById('wxAmedasSection').style.display = 'none';
@@ -230,7 +346,6 @@ function showAmedasDetail(s) {
   document.getElementById('amCellWind').onclick = () => fetchAmedasChart('wind', '過去24時間の風速');
   document.getElementById('amCellWindDir').onclick = () => fetchAmedasChart('winddir', '過去24時間の風向（頻度）');
   document.getElementById('amCellSnow').onclick = () => fetchAmedasChart('snow', '過去24時間の積雪深');
-  /* 最低気温補完 */
   (async () => {
     const jst = new Date(new Date().getTime() + 9 * 3600000);
     const p = n => String(n).padStart(2, '0');
@@ -432,9 +547,9 @@ function removeChart(id) {
 /* ─── パネル開閉 ─────────────────────────────── */
 function openWxPanel() {
   wxOpen = true;
-  const wxPanel = document.getElementById('wxPanel');
-  wxPanel.style.display = 'flex';
-  document.getElementById('btnWx').classList.add('active');
+  document.getElementById('wxPanel').style.display = 'flex';
+  const chk = document.getElementById('chkWeather');
+  if (chk) chk.checked = true;
   const center = map.getCenter();
   fetchWeather(center.lat, center.lng);
 }
@@ -442,14 +557,31 @@ function openWxPanel() {
 function closeWxPanel() {
   wxOpen = false;
   document.getElementById('wxPanel').style.display = 'none';
-  document.getElementById('btnWx').classList.remove('active');
+  const chk = document.getElementById('chkWeather');
+  if (chk) chk.checked = false;
+  /* 気象レイヤは維持（パネルを閉じてもレイヤはONのまま） */
 }
 
 /* ─── 初期化 ─────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   const wxPanel = document.getElementById('wxPanel');
 
-  document.getElementById('btnWx').onclick = () => wxOpen ? closeWxPanel() : openWxPanel();
+  /* Leaflet カスタムコントロール（右上レイヤ選択の下） */
+  const WxCtrl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd() {
+      const div = L.DomUtil.create('div', 'leaflet-control wx-ctrl-wrap');
+      div.innerHTML = `<label class="wx-ctrl-label"><input type="checkbox" id="chkWeather"><span>☁️ 天気情報</span></label>`;
+      L.DomEvent.disableClickPropagation(div);
+      return div;
+    }
+  });
+  new WxCtrl().addTo(map);
+
+  document.getElementById('chkWeather').addEventListener('change', function() {
+    if (this.checked) openWxPanel(); else closeWxPanel();
+  });
+
   document.getElementById('wxClose').onclick = closeWxPanel;
   document.getElementById('wxRefresh').onclick = () => {
     const center = map.getCenter();
@@ -460,6 +592,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('chartSheet').classList.remove('open');
     _activeChartId = null;
   };
+
+  /* 気象レイヤチェックボックス */
+  Object.keys(WX_CHK_MAP).forEach(key => {
+    document.getElementById(WX_CHK_MAP[key]).addEventListener('change', function() {
+      wxLayerState[key].on = this.checked;
+      wxApplyLayerState(key);
+    });
+  });
+
+  /* AMeDASマーカーチェックボックス */
+  document.getElementById('chkLAmedas').addEventListener('change', function() {
+    amedasOn = this.checked;
+    document.getElementById('lblLAmedas').classList.toggle('active', amedasOn);
+    if (amedasOn) {
+      fetchAmedasMarkers();
+      amedasTimer = setInterval(fetchAmedasMarkers, 10 * 60 * 1000);
+    } else {
+      clearInterval(amedasTimer); amedasTimer = null;
+      amedasMarkers.forEach(mk => map.removeLayer(mk)); amedasMarkers = [];
+    }
+  });
 
   /* パネルドラッグ */
   const handle = document.getElementById('wxHandle');

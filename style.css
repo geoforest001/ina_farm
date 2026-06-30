@@ -32,27 +32,32 @@ body {
   filter: grayscale(100%);
 }
 
-/* ─── 天気ボタン ─────────────────────────────── */
-#btnWx {
-  position: fixed;
-  bottom: 24px;
-  left: 16px;
-  z-index: 9050;
-  width: 48px;
-  height: 48px;
-  border: none;
-  border-radius: 50%;
+/* ─── 天気情報コントロール（右上レイヤ選択の下） ── */
+.wx-ctrl-wrap {
   background: rgba(255,255,255,0.95);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.22);
-  font-size: 22px;
-  cursor: pointer;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+  margin-top: 4px;
+}
+.wx-ctrl-label {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
+  gap: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  white-space: nowrap;
+  user-select: none;
 }
-#btnWx.active { background: #e0f0ff; }
-#btnWx:hover  { background: #f0f8ff; }
+.wx-ctrl-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #1e6e42;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.wx-ctrl-label:hover { background: #f5faf6; }
 
 /* ─── 天気パネル ─────────────────────────────── */
 #wxPanel {
@@ -188,6 +193,45 @@ body {
 .dc-ico  { font-size: 18px; }
 .dc-pop  { color: #0060cc; }
 .dc-tmp  { color: #555; }
+
+/* ─── 気象レイヤチェックボックス ────────────── */
+#wxLayerLabel {
+  font-size: 10px;
+  color: #999;
+  font-weight: bold;
+  border-top: 1px solid #eee;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+#wxLayers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.wx-chk-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #444;
+  background: #fff;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.wx-chk-item input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  accent-color: #0066ff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.wx-chk-item .ico { font-size: 13px; }
+.wx-chk-item.active { background: #eef4ff; border-color: #0066ff; color: #0044cc; }
+.wx-chk-item:hover  { background: #f0f4ff; }
 
 /* AMeDAS */
 #wxAmedasLoading {
