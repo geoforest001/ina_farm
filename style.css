@@ -32,38 +32,11 @@ body {
   filter: grayscale(100%);
 }
 
-/* ─── 天気情報コントロール（右上レイヤ選択の下） ── */
-.wx-ctrl-wrap {
-  background: rgba(255,255,255,0.95);
-  border-radius: 4px;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.25);
-  margin-top: 4px;
-}
-.wx-ctrl-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #333;
-  white-space: nowrap;
-  user-select: none;
-}
-.wx-ctrl-label input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: #1e6e42;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.wx-ctrl-label:hover { background: #f5faf6; }
-
 /* ─── 天気パネル ─────────────────────────────── */
 #wxPanel {
   position: fixed;
   top: 10px;
-  left: 10px;
+  left: 60px;
   z-index: 9100;
   background: rgba(255,255,255,0.97);
   border-radius: 14px;

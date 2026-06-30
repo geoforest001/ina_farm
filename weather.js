@@ -77,7 +77,7 @@ function jmaTime(intervalMin = 5, lagMin = 5) {
 async function getJmaValidTime(type, candidates) {
   for (const file of (candidates || ['targetTimes_N1.json'])) {
     try {
-      const res = await fetch(`https://www.jma.go.jp/bosai/jmatile/data/${type}/${file}`, {cache:'no-store'});
+      const res = await fetch(`https://www.jma.go.jp/bosai/jmatile/data/${type}/${file}`);
       if (!res.ok) continue;
       const arr = await res.json();
       if (!Array.isArray(arr) || !arr.length) continue;
@@ -139,31 +139,41 @@ function _prependCurrent(labels, data) {
 async function wxUpdateLayer(key) {
   const def = WX_LAYER_DEFS[key], st = wxLayerState[key];
   if (!st.on) return;
-  const times = await getJmaValidTime(def.type, def.tf);
-  const t = jmaTime(5, 10);
-  const urlTpl = times ? def.url(times.basetime, times.validtime) : def.url(t, t);
-  if (st.layer) map.removeLayer(st.layer);
-  st.errCount = 0;
-  const lbl = document.getElementById(WX_LBL_MAP[key]);
-  const lyr = L.tileLayer(urlTpl, {opacity:0.6, maxNativeZoom:def.zoom, maxZoom:22, attribution:'© 気象庁'});
-  lyr.on('tileerror', () => {
-    st.errCount++;
-    if (st.errCount === 3 && lbl) lbl.style.borderColor = '#ff3b30';
-  });
-  lyr.on('tileload', () => { st.errCount = 0; if (lbl) lbl.style.borderColor = ''; });
-  st.layer = lyr.addTo(map);
+  try {
+    const times = await getJmaValidTime(def.type, def.tf);
+    const t = jmaTime(5, 10);
+    const urlTpl = times ? def.url(times.basetime, times.validtime) : def.url(t, t);
+    console.log(`[wxLayer] ${key} url=${urlTpl.replace('{z}/{x}/{y}.png','...')}`);
+    if (st.layer) map.removeLayer(st.layer);
+    st.errCount = 0;
+    const lbl = document.getElementById(WX_LBL_MAP[key]);
+    const lyr = L.tileLayer(urlTpl, {opacity:0.7, maxNativeZoom:def.zoom, maxZoom:22, attribution:'© 気象庁'});
+    lyr.on('tileerror', () => {
+      st.errCount++;
+      console.warn(`[wxLayer] tileerror count=${st.errCount} key=${key}`);
+      if (st.errCount === 3 && lbl) lbl.style.borderColor = '#ff3b30';
+    });
+    lyr.on('tileload', () => { st.errCount = 0; if (lbl) lbl.style.borderColor = ''; });
+    st.layer = lyr.addTo(map);
+  } catch(e) {
+    console.error('[wxUpdateLayer]', key, e);
+  }
 }
 
 async function wxApplyLayerState(key) {
-  const st = wxLayerState[key];
-  const lbl = document.getElementById(WX_LBL_MAP[key]);
-  if (lbl) lbl.classList.toggle('active', st.on);
-  if (st.on) {
-    await wxUpdateLayer(key);
-    if (!st.timer) st.timer = setInterval(() => wxUpdateLayer(key), 5 * 60 * 1000);
-  } else {
-    clearInterval(st.timer); st.timer = null;
-    if (st.layer) { map.removeLayer(st.layer); st.layer = null; }
+  try {
+    const st = wxLayerState[key];
+    const lbl = document.getElementById(WX_LBL_MAP[key]);
+    if (lbl) lbl.classList.toggle('active', st.on);
+    if (st.on) {
+      await wxUpdateLayer(key);
+      if (!st.timer) st.timer = setInterval(() => wxUpdateLayer(key), 5 * 60 * 1000);
+    } else {
+      clearInterval(st.timer); st.timer = null;
+      if (st.layer) { map.removeLayer(st.layer); st.layer = null; }
+    }
+  } catch(e) {
+    console.error('[wxApplyLayerState]', key, e);
   }
 }
 
@@ -566,21 +576,21 @@ function closeWxPanel() {
 document.addEventListener('DOMContentLoaded', () => {
   const wxPanel = document.getElementById('wxPanel');
 
-  /* Leaflet カスタムコントロール（右上レイヤ選択の下） */
-  const WxCtrl = L.Control.extend({
-    options: { position: 'topright' },
-    onAdd() {
-      const div = L.DomUtil.create('div', 'leaflet-control wx-ctrl-wrap');
-      div.innerHTML = `<label class="wx-ctrl-label"><input type="checkbox" id="chkWeather"><span>☁️ 天気情報</span></label>`;
-      L.DomEvent.disableClickPropagation(div);
-      return div;
-    }
-  });
-  new WxCtrl().addTo(map);
-
-  document.getElementById('chkWeather').addEventListener('change', function() {
-    if (this.checked) openWxPanel(); else closeWxPanel();
-  });
+  /* 既存のLeafletレイヤコントロールに「天気情報」チェックを注入 */
+  function injectWeatherCheckbox() {
+    const overlays = document.querySelector('.leaflet-control-layers-overlays');
+    if (!overlays) { setTimeout(injectWeatherCheckbox, 150); return; }
+    const sep = document.createElement('div');
+    sep.className = 'leaflet-control-layers-separator';
+    overlays.appendChild(sep);
+    const lbl = document.createElement('label');
+    lbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>天気情報</span>';
+    overlays.appendChild(lbl);
+    document.getElementById('chkWeather').addEventListener('change', function() {
+      if (this.checked) openWxPanel(); else closeWxPanel();
+    });
+  }
+  injectWeatherCheckbox();
 
   document.getElementById('wxClose').onclick = closeWxPanel;
   document.getElementById('wxRefresh').onclick = () => {
