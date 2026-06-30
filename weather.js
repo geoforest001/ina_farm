@@ -31,10 +31,10 @@ const AM_CHART_VARS = {
 
 /* 気象レイヤ定義 */
 const WX_LAYER_DEFS = {
-  rain:  {type:'nowc', zoom:10, tf:['targetTimes_N1.json'], url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`},
-  land:  {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/land/{z}/{x}/{y}.png`},
-  flood: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/inund/{z}/{x}/{y}.png`},
-  river: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/none/${vt}/surf/flood/{z}/{x}/{y}.png`},
+  rain:  {type:'nowc', zoom:10, tf:['targetTimes_N1.json'], url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`},
+  land:  {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/land/{z}/{x}/{y}.png`},
+  flood: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/inund/{z}/{x}/{y}.png`},
+  river: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/flood/{z}/{x}/{y}.png`},
 };
 const wxLayerState = {};
 Object.keys(WX_LAYER_DEFS).forEach(k => { wxLayerState[k] = {on:false, layer:null, timer:null, errCount:0}; });
@@ -66,10 +66,11 @@ function jmaCodeIcon(code) {
 }
 
 function jmaTime(intervalMin = 5, lagMin = 5) {
-  const now = new Date(), jst = new Date(now.getTime() + 9 * 3600000);
-  const total = jst.getUTCHours() * 60 + jst.getUTCMinutes();
-  const floored = Math.floor(total / intervalMin) * intervalMin - lagMin;
-  const d = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate(), 0, floored, 0));
+  /* JMAタイルのタイムスタンプはUTC */
+  const now = new Date();
+  const totalMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const floored = Math.floor(totalMin / intervalMin) * intervalMin - lagMin;
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, floored, 0));
   const p = n => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${p(d.getUTCMonth()+1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}00`;
 }
@@ -81,12 +82,13 @@ async function getJmaValidTime(type, candidates) {
       if (!res.ok) continue;
       const arr = await res.json();
       if (!Array.isArray(arr) || !arr.length) continue;
-      const last = arr[arr.length - 1];
-      if (typeof last === 'string') return {basetime: last, validtime: last};
-      const bt = last.basetime || last.time || '';
-      const vt = last.validtime || bt;
-      if (bt) return {basetime: bt, validtime: vt};
-    } catch(e) {}
+      const first = arr[0]; /* 配列は新しい順なので先頭が最新 */
+      if (typeof first === 'string') return {basetime: first, validtime: first, member: 'none'};
+      const bt = first.basetime || first.time || '';
+      const vt = first.validtime || bt;
+      const member = first.member || 'none';
+      if (bt) return {basetime: bt, validtime: vt, member};
+    } catch(e) { console.warn('[getJmaValidTime]', e); }
   }
   return null;
 }
@@ -142,8 +144,9 @@ async function wxUpdateLayer(key) {
   try {
     const times = await getJmaValidTime(def.type, def.tf);
     const t = jmaTime(5, 10);
-    const urlTpl = times ? def.url(times.basetime, times.validtime) : def.url(t, t);
-    console.log(`[wxLayer] ${key} url=${urlTpl.replace('{z}/{x}/{y}.png','...')}`);
+    const mb = times?.member || 'none';
+    const urlTpl = times ? def.url(times.basetime, times.validtime, mb) : def.url(t, t, 'none');
+    console.log(`[wxLayer] ${key} bt=${times?.basetime || t} mb=${mb}`);
     if (st.layer) map.removeLayer(st.layer);
     st.errCount = 0;
     const lbl = document.getElementById(WX_LBL_MAP[key]);
