@@ -51,6 +51,7 @@ let _cwCounter = 0;
 const _charts = new Map();
 let _activeChartId = null, _sheetChart = null;
 let amedasOn = false, amedasMarkers = [], amedasTimer = null;
+let weatherTimer = null;
 
 /* ─── ユーティリティ ─────────────────────────── */
 function jmaCodeIcon(code) {
@@ -349,7 +350,7 @@ function showAmedasDetail(s) {
   document.getElementById('amRain10m').textContent = s.d.precipitation10m ? `${s.d.precipitation10m[0]}mm` : '--';
   document.getElementById('amRain24h').textContent = s.d.precipitation24h ? `${s.d.precipitation24h[0]}mm` : '--';
   document.getElementById('amWind').textContent = s.d.wind ? `${s.d.wind[0]}m/s` : '--';
-  document.getElementById('amWindDir').textContent = s.d.wind ? (WIND_DIR[s.d.wind[1]] || '--') : '--';
+  document.getElementById('amWindDir').textContent = s.d.windDirection ? (WIND_DIR[s.d.windDirection[0]] || '--') : '--';
   document.getElementById('amSnow').textContent = s.d.snow ? `${s.d.snow[0]}cm` : '--';
   document.getElementById('amCellTemp').onclick = () => fetchAmedasChart('temp', '過去24時間の気温');
   document.getElementById('amCellHumid').onclick = () => fetchAmedasChart('humid', '過去24時間の湿度');
@@ -565,6 +566,11 @@ function openWxPanel() {
   if (chk) chk.checked = true;
   const center = map.getCenter();
   fetchWeather(center.lat, center.lng);
+  clearInterval(weatherTimer);
+  weatherTimer = setInterval(() => {
+    const c = map.getCenter();
+    fetchWeather(c.lat, c.lng);
+  }, 10 * 60 * 1000);
 }
 
 function closeWxPanel() {
@@ -572,6 +578,7 @@ function closeWxPanel() {
   document.getElementById('wxPanel').style.display = 'none';
   const chk = document.getElementById('chkWeather');
   if (chk) chk.checked = false;
+  clearInterval(weatherTimer); weatherTimer = null;
   /* 気象レイヤは維持（パネルを閉じてもレイヤはONのまま） */
 }
 
@@ -639,6 +646,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('wxRefresh').onclick = () => {
     const center = map.getCenter();
     fetchWeather(center.lat, center.lng);
+    clearInterval(weatherTimer);
+    weatherTimer = setInterval(() => {
+      const c = map.getCenter();
+      fetchWeather(c.lat, c.lng);
+    }, 10 * 60 * 1000);
   };
   document.getElementById('wxCollapseBtn').onclick = () => wxPanel.classList.toggle('collapsed');
   document.getElementById('chartSheetClose').onclick = () => {
