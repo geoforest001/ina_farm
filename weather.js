@@ -31,15 +31,17 @@ const AM_CHART_VARS = {
 
 /* 気象レイヤ定義 */
 const WX_LAYER_DEFS = {
-  rain:  {type:'nowc', zoom:10, tf:['targetTimes_N1.json'], url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`},
-  land:  {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/land/{z}/{x}/{y}.png`},
-  flood: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/inund/{z}/{x}/{y}.png`},
-  river: {type:'risk', zoom:9,  tf:['targetTimes.json'],    url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/risk/${bt}/${mb}/${vt}/surf/flood/{z}/{x}/{y}.png`},
+  rain: {type:'nowc', zoom:10, tf:['targetTimes_N1.json'], url:(bt,vt,mb)=>`https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`},
 };
 const wxLayerState = {};
 Object.keys(WX_LAYER_DEFS).forEach(k => { wxLayerState[k] = {on:false, layer:null, timer:null, errCount:0}; });
-const WX_CHK_MAP = {rain:'chkLRain', land:'chkLLand', flood:'chkLFlood', river:'chkLRiver'};
-const WX_LBL_MAP = {rain:'lblLRain', land:'lblLLand', flood:'lblLFlood', river:'lblLRiver'};
+const WX_CHK_MAP = {rain:'chkLRain'};
+const WX_LBL_MAP = {rain:'lblLRain'};
+
+/* 長野県 河川砂防情報ステーション */
+const SABO_GIS  = 'https://www.gis.sabo-nagano.jp';
+const SABO_BASE = 'https://www.sabo-nagano.jp';
+const STAGE_COL = {'-3':'#888','-2':'#888','-1':'#888','0':'#2e7d32','1':'#f9a825','2':'#e65100','3':'#c62828','4':'#6a0080'};
 
 let _jmaForecast = null;
 let _amedasCurrentTemp = null, _amedasCurrentTime = null;
@@ -52,6 +54,9 @@ const _charts = new Map();
 let _activeChartId = null, _sheetChart = null;
 let amedasOn = false, amedasMarkers = [], amedasTimer = null;
 let weatherTimer = null;
+const _rainAnim = {on:false, frames:[], idx:0, layer:null, frameTimer:null, refreshTimer:null};
+let _kikendoOn = false, _kikendoOverlays = [], _kikendoTimer = null;
+let riverOn = false, riverMarkers = [], riverTimer = null;
 
 /* ─── ユーティリティ ─────────────────────────── */
 function jmaCodeIcon(code) {
@@ -582,6 +587,227 @@ function closeWxPanel() {
   /* 気象レイヤは維持（パネルを閉じてもレイヤはONのまま） */
 }
 
+/* ─── 雨雲アニメーション ─────────────────────── */
+function _parseJmaTime(t) {
+  if (!t || t.length < 12) return 0;
+  return Date.UTC(+t.slice(0,4),+t.slice(4,6)-1,+t.slice(6,8),+t.slice(8,10),+t.slice(10,12));
+}
+function _fmtJmaTime(ms) {
+  const d = new Date(ms), p = n => String(n).padStart(2,'0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth()+1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}00`;
+}
+
+async function _startRainAnim() {
+  const status = document.getElementById('rainAnimStatus');
+  const lbl = document.getElementById('lblLRainAnim');
+  if (status) { status.textContent = '🌀 取得中...'; status.style.display = 'block'; }
+  try {
+    const res = await fetch('https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json',{cache:'no-store'});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const arr = await res.json();
+    if (!Array.isArray(arr) || !arr.length) throw new Error('フレームなし');
+    const latest = arr[0];
+    const latestBt = typeof latest === 'string' ? latest : (latest.basetime || latest.validtime);
+    const btMs = _parseJmaTime(latestBt);
+    const obsFrames = arr.slice(0,12).map(e => {
+      const t = typeof e === 'string' ? e : (e.basetime || e.validtime);
+      return {bt:t, vt:t};
+    }).reverse();
+    const fcFrames = Array.from({length:12}, (_,i) => ({bt:latestBt, vt:_fmtJmaTime(btMs+(i+1)*5*60000)}));
+    _rainAnim.frames = [...obsFrames, ...fcFrames];
+    _rainAnim.idx = 0;
+    clearInterval(_rainAnim.frameTimer);
+    _rainAnim.frameTimer = setInterval(_stepRainAnim, 700);
+    _stepRainAnim();
+    if (lbl) lbl.style.borderColor = '';
+  } catch(e) {
+    console.error('[RainAnim]', e);
+    if (status) status.textContent = '❌ 雨雲取得失敗';
+    if (lbl) lbl.style.borderColor = '#ff3b30';
+  }
+}
+function _stepRainAnim() {
+  if (!_rainAnim.on || !_rainAnim.frames.length) return;
+  const {bt, vt} = _rainAnim.frames[_rainAnim.idx];
+  const url = `https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`;
+  const newLayer = L.tileLayer(url, {opacity:0.65, maxNativeZoom:10, maxZoom:22, attribution:'© 気象庁'});
+  newLayer.addTo(map);
+  if (_rainAnim.layer) map.removeLayer(_rainAnim.layer);
+  _rainAnim.layer = newLayer;
+  const status = document.getElementById('rainAnimStatus');
+  if (status) {
+    const diffMin = Math.round((_parseJmaTime(vt) - _parseJmaTime(bt)) / 60000);
+    const hhmm = `${vt.slice(8,10)}:${vt.slice(10,12)}`;
+    status.textContent = diffMin === 0 ? `🌀 ${hhmm} 観測` : `🌀 ${hhmm} (+${diffMin}分 予測)`;
+    status.style.color = diffMin === 0 ? '#aaa' : '#7ec8e3';
+  }
+  _rainAnim.idx = (_rainAnim.idx + 1) % _rainAnim.frames.length;
+}
+function _stopRainAnim() {
+  clearInterval(_rainAnim.frameTimer); _rainAnim.frameTimer = null;
+  clearInterval(_rainAnim.refreshTimer); _rainAnim.refreshTimer = null;
+  if (_rainAnim.layer) { map.removeLayer(_rainAnim.layer); _rainAnim.layer = null; }
+  _rainAnim.frames = []; _rainAnim.idx = 0;
+  const status = document.getElementById('rainAnimStatus');
+  if (status) status.style.display = 'none';
+}
+
+/* ─── 危険度メッシュ（長野県 河川砂防情報ステーション） ── */
+async function _loadKikendoMesh() {
+  _kikendoOverlays.forEach(ov => map.removeLayer(ov)); _kikendoOverlays = [];
+  const lbl = document.getElementById('lblLKikendo');
+  const statusDiv = document.getElementById('wxKikendo');
+  if (statusDiv) { statusDiv.style.display = 'block'; statusDiv.style.color = '#aaa'; statusDiv.textContent = '⚠ 危険度取得中...'; }
+  try {
+    const idx = await fetch(`${SABO_GIS}/gisdata/mesh/KikendoMesh.json`,{cache:'no-store'}).then(r=>r.json());
+    const latest = idx.latest;
+    const parts = latest.split('-');
+    const ymd = parts[0]+parts[1]+parts[2];
+    const hhmm = parts[3]+parts[4];
+    const tilesRes = await fetch(`${SABO_GIS}/gisdata/mesh/kikendo/${ymd}/${hhmm}/mesh_tiles.json`,{cache:'no-store'});
+    if (!tilesRes.ok) {
+      if (statusDiv) statusDiv.textContent = '⚠ 危険域なし（平常）';
+      if (lbl) lbl.style.borderColor = '';
+      return;
+    }
+    const tilesJson = await tilesRes.json();
+    const baseUrl = `${SABO_GIS}/gisdata/mesh/kikendo/${ymd}/${hhmm}/`;
+    for (const tile of (tilesJson.tiles || [])) {
+      const {north, south, east, west} = tile.latLon;
+      const ov = L.imageOverlay(baseUrl+tile.file, [[south,west],[north,east]], {opacity:0.7, interactive:false});
+      ov.addTo(map);
+      _kikendoOverlays.push(ov);
+    }
+    if (statusDiv) statusDiv.textContent = `⚠ 危険度メッシュ ${parts[3]}:${parts[4]} 更新 (${_kikendoOverlays.length}タイル)`;
+    if (lbl) lbl.style.borderColor = '';
+  } catch(e) {
+    console.error('[Kikendo]', e);
+    if (statusDiv) { statusDiv.style.color = '#ff6b6b'; statusDiv.textContent = '❌ 危険度取得失敗'; }
+    if (lbl) lbl.style.borderColor = '#ff3b30';
+  }
+}
+
+/* ─── 水位観測（長野県 河川砂防情報ステーション） ─────── */
+function _stageColor(level) { return STAGE_COL[String(level)] || '#888'; }
+function _stageLabel(level) { return (['平水','待機','注意','避難','危険'][level] || ''); }
+
+async function rpFetch(url, opts) {
+  const proxies = [
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  ];
+  for (const px of proxies) {
+    try {
+      const r = await fetch(px(url), opts || {});
+      if (r.status !== 429 && r.status !== 403) return r;
+    } catch {}
+  }
+  throw new Error('プロキシ接続失敗');
+}
+
+async function fetchRiverData() {
+  riverMarkers.forEach(mk => map.removeLayer(mk)); riverMarkers = [];
+  const div = document.getElementById('wxRiver');
+  const lbl = document.getElementById('lblLRiverLevel');
+  if (div) { div.style.color = '#aaa'; div.textContent = '💧 水位データ取得中...'; div.style.display = 'block'; }
+  try {
+    const r = await fetch(`${SABO_GIS}/gisdata/river/SuiiPoint.geo.json`,{cache:'no-store'});
+    if (!r.ok) throw new Error(`GeoJSON HTTP ${r.status}`);
+    const gj = await r.json();
+    const b = map.getBounds();
+    let count = 0;
+    for (const feat of (gj.features || [])) {
+      const c = feat.geometry?.coordinates;
+      if (!c) continue;
+      const lng = c[0], lat = c[1];
+      if (!b.contains([lat, lng])) continue;
+      const props = feat.properties || {};
+      const key = props.id; if (!key) continue;
+      const sd = props.data;
+      const level = sd?.item_10?.level ?? -1;
+      const value = sd?.item_10?.value;
+      const obsTime = sd?.time;
+      const col = _stageColor(level);
+      const levelStr = value != null ? `${Number(value).toFixed(2)}m` : '--';
+      const name = props.nm || key;
+      const river = props.rv || '';
+      const timeStr = obsTime ? `${obsTime.slice(11,13)}:${obsTime.slice(14,16)}` : '';
+      const mk = L.marker([lat, lng], {icon: L.divIcon({
+        html: `<div style="background:#fff;color:${col};border:2px solid ${col};border-radius:6px;padding:2px 6px;font-size:11px;font-family:sans-serif;font-weight:bold;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.25)">${levelStr}</div>`,
+        className:'', iconAnchor:[20,12]
+      })}).addTo(map);
+      const pDiv = document.createElement('div');
+      pDiv.style.cssText = 'font-size:12px;font-family:sans-serif;min-width:190px';
+      const riverHtml = river ? `<span style="font-size:10px;color:#888"> (${river})</span>` : '';
+      const timeHtml = timeStr ? `<span style="font-size:9px;color:#aaa"> (${timeStr}観測)</span>` : '';
+      const lvLabel = level >= 0 ? `<span style="color:${col}"> ${_stageLabel(level)}</span>` : '';
+      const encKey = encodeURIComponent(key), encName = encodeURIComponent(name);
+      pDiv.innerHTML = `<b>💧 ${name}</b>${riverHtml}${timeHtml}<br><div style="font-size:14px;font-weight:bold;color:${col};margin:3px 0">水位: ${levelStr}${lvLabel}</div><div style="display:flex;gap:4px;margin-top:5px"><button data-key="${encKey}" data-nm="${encName}" data-h="6" class="rv-btn">📈 6時間</button><button data-key="${encKey}" data-nm="${encName}" data-h="24" class="rv-btn">📈 24時間</button></div><div style="font-size:9px;color:#aaa;margin-top:3px">出典: 長野県 河川砂防情報ステーション</div>`;
+      pDiv.querySelectorAll('.rv-btn').forEach(btn => {
+        btn.style.cssText = 'flex:1;padding:3px 5px;font-size:11px;border:1px solid #0066ff;background:#fff;border-radius:4px;cursor:pointer;color:#0066ff';
+        btn.onclick = () => showRiverChart(decodeURIComponent(btn.dataset.key), Number(btn.dataset.h), decodeURIComponent(btn.dataset.nm));
+      });
+      mk.bindPopup(pDiv);
+      riverMarkers.push(mk); count++;
+    }
+    const now = new Date(), pn = v => String(v).padStart(2,'0');
+    if (div) {
+      div.style.color = count ? '#aaa' : '#888';
+      div.textContent = count
+        ? `💧 水位観測 ${count}地点 (${pn(now.getHours())}:${pn(now.getMinutes())} 更新)`
+        : '⚠ 表示エリアに水位観測所なし';
+    }
+    if (lbl) lbl.style.borderColor = '';
+  } catch(e) {
+    console.error('[River]', e);
+    if (div) { div.style.color = '#ff6b6b'; div.innerHTML = `❌ 水位取得失敗: ${e.message}`; }
+    if (document.getElementById('lblLRiverLevel')) document.getElementById('lblLRiverLevel').style.borderColor = '#ff3b30';
+  }
+}
+
+async function showRiverChart(stationKey, hours, stationName) {
+  const w = openChartWindow(`${stationName} 水位(過去${hours}h)`);
+  try {
+    const pad = n => String(n).padStart(2,'0');
+    const nowMs = Date.now() + 9 * 3600000;
+    const cutMs = nowMs - hours * 3600000;
+    const blocks = new Set();
+    for (let h = 0; h <= hours + 4; h += 4) {
+      const t = new Date(nowMs - h * 3600000);
+      const d = `${t.getUTCFullYear()}${pad(t.getUTCMonth()+1)}${pad(t.getUTCDate())}`;
+      const n = Math.floor(t.getUTCHours() / 4) + 1;
+      blocks.add(`${d}/${d}_${n}_stage_10.json`);
+    }
+    const responses = await Promise.allSettled([...blocks].map(bp =>
+      rpFetch(`${SABO_BASE}/dyn/json/dat/pc/${bp}`, {cache:'no-store'})
+    ));
+    const pts = [];
+    for (const res of responses) {
+      if (res.status !== 'fulfilled') continue;
+      const r = res.value; if (!r.ok) continue;
+      const json = await r.json();
+      const stn = json[stationKey]; if (!stn?.data10) continue;
+      for (const pt of stn.data10) {
+        const t = pt.time; if (!t || t.length < 16) continue;
+        const ms = Date.UTC(+t.slice(0,4),+t.slice(5,7)-1,+t.slice(8,10),+t.slice(11,13),+t.slice(14,16));
+        if (ms < cutMs) continue;
+        pts.push({ms, label:`${t.slice(11,13)}:${t.slice(14,16)}`, value:pt.item_10?.value});
+      }
+    }
+    pts.sort((a,b) => a.ms - b.ms);
+    const seen = new Set(), uniq = [];
+    for (const pt of pts) { if (!seen.has(pt.ms)) { seen.add(pt.ms); uniq.push(pt); } }
+    if (!uniq.length) { w.setError('時系列データなし'); return; }
+    w.setChart(
+      uniq.map(pt => pt.label),
+      [{label:'水位(m)', data:uniq.map(pt => pt.value!=null&&pt.value!==''?Number(pt.value):null),
+        type:'line', backgroundColor:'rgba(0,102,255,0.12)', borderColor:'rgba(0,102,255,0.8)',
+        borderWidth:2, fill:true, tension:0.3, pointRadius:2, spanGaps:true}],
+      '長野県 河川砂防情報ステーション', {beginAtZero:false}
+    );
+  } catch(e) { w.setError(`取得失敗: ${e.message}`); }
+}
+
 /* ─── 初期化 ─────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   const wxPanel = document.getElementById('wxPanel');
@@ -616,13 +842,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const wxLayersDiv = document.createElement('div');
     wxLayersDiv.id = 'wxLayers';
     wxLayersDiv.innerHTML = `
-      <label class="wx-chk-item" id="lblLRain"><input type="checkbox" id="chkLRain"><span class="ico">🌧</span><span>雨量現況</span></label>
-      <label class="wx-chk-item" id="lblLLand"><input type="checkbox" id="chkLLand"><span class="ico">⛰</span><span>土砂危険</span></label>
-      <label class="wx-chk-item" id="lblLFlood"><input type="checkbox" id="chkLFlood"><span class="ico">🌊</span><span>浸水危険</span></label>
-      <label class="wx-chk-item" id="lblLRiver"><input type="checkbox" id="chkLRiver"><span class="ico">🏞</span><span>河川危険度</span></label>
+      <label class="wx-chk-item" id="lblLRain"><input type="checkbox" id="chkLRain"><span class="ico">🌧</span><span>レーダー雨量</span></label>
+      <label class="wx-chk-item" id="lblLRainAnim"><input type="checkbox" id="chkLRainAnim"><span class="ico">🌀</span><span>雨雲の動き</span></label>
+      <label class="wx-chk-item" id="lblLKikendo"><input type="checkbox" id="chkLKikendo"><span class="ico">⚠</span><span>危険度</span></label>
+      <label class="wx-chk-item" id="lblLRiverLevel"><input type="checkbox" id="chkLRiverLevel"><span class="ico">💧</span><span>水位観測</span></label>
       <label class="wx-chk-item" id="lblLAmedas"><input type="checkbox" id="chkLAmedas"><span class="ico">📡</span><span>アメダス</span></label>
     `;
     overlays.appendChild(wxLayersDiv);
+
+    /* ステータス表示エリア */
+    const mkStatus = (id, style) => {
+      const d = document.createElement('div');
+      d.id = id;
+      d.style.cssText = `display:none;font-size:10px;color:#aaa;padding:3px 6px;${style||''}`;
+      overlays.appendChild(d);
+    };
+    mkStatus('wxRiver');
+    mkStatus('rainAnimStatus');
+    mkStatus('wxKikendo');
+    const wxAmedasDiv = document.createElement('div'); wxAmedasDiv.id = 'wxAmedas'; overlays.appendChild(wxAmedasDiv);
 
     /* 気象情報ダッシュボード チェックボックス */
     const sep2 = document.createElement('div');
@@ -640,12 +878,51 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('chkWeather').addEventListener('change', function() {
       if (this.checked) openWxPanel(); else closeWxPanel();
     });
-    Object.keys(WX_CHK_MAP).forEach(key => {
-      document.getElementById(WX_CHK_MAP[key]).addEventListener('change', function() {
-        wxLayerState[key].on = this.checked;
-        wxApplyLayerState(key);
-      });
+    /* レーダー雨量 */
+    document.getElementById('chkLRain').addEventListener('change', function() {
+      wxLayerState['rain'].on = this.checked;
+      wxApplyLayerState('rain');
     });
+    /* 雨雲アニメーション */
+    document.getElementById('chkLRainAnim').addEventListener('change', function() {
+      _rainAnim.on = this.checked;
+      document.getElementById('lblLRainAnim').classList.toggle('active', _rainAnim.on);
+      if (_rainAnim.on) {
+        _startRainAnim();
+        if (!_rainAnim.refreshTimer) _rainAnim.refreshTimer = setInterval(_startRainAnim, 10 * 60 * 1000);
+      } else {
+        _stopRainAnim();
+      }
+    });
+    /* 危険度メッシュ */
+    document.getElementById('chkLKikendo').addEventListener('change', function() {
+      _kikendoOn = this.checked;
+      document.getElementById('lblLKikendo').classList.toggle('active', _kikendoOn);
+      if (_kikendoOn) {
+        _loadKikendoMesh();
+        if (!_kikendoTimer) _kikendoTimer = setInterval(_loadKikendoMesh, 10 * 60 * 1000);
+      } else {
+        clearInterval(_kikendoTimer); _kikendoTimer = null;
+        _kikendoOverlays.forEach(ov => map.removeLayer(ov)); _kikendoOverlays = [];
+        const s = document.getElementById('wxKikendo'); if (s) s.style.display = 'none';
+        document.getElementById('lblLKikendo').style.borderColor = '';
+      }
+    });
+    /* 水位観測 */
+    document.getElementById('chkLRiverLevel').addEventListener('change', function() {
+      riverOn = this.checked;
+      document.getElementById('lblLRiverLevel').classList.toggle('active', riverOn);
+      if (riverOn) {
+        fetchRiverData();
+        if (!riverTimer) riverTimer = setInterval(fetchRiverData, 10 * 60 * 1000);
+      } else {
+        clearInterval(riverTimer); riverTimer = null;
+        riverMarkers.forEach(mk => map.removeLayer(mk)); riverMarkers = [];
+        const s = document.getElementById('wxRiver'); if (s) s.style.display = 'none';
+      }
+    });
+    map.on('moveend', () => { if (riverOn) fetchRiverData(); });
+    /* アメダスマーカー */
     document.getElementById('chkLAmedas').addEventListener('change', function() {
       amedasOn = this.checked;
       document.getElementById('lblLAmedas').classList.toggle('active', amedasOn);
