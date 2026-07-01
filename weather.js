@@ -586,25 +586,31 @@ function closeWxPanel() {
 document.addEventListener('DOMContentLoaded', () => {
   const wxPanel = document.getElementById('wxPanel');
 
-  /* 既存のLeafletレイヤコントロールに「天気情報」チェックを注入 */
+  /* 既存のLeafletレイヤコントロールに見出しと気象チェックを注入 */
   function injectWeatherCheckbox() {
     const overlays = document.querySelector('.leaflet-control-layers-overlays');
-    if (!overlays) { setTimeout(injectWeatherCheckbox, 150); return; }
+    const base    = document.querySelector('.leaflet-control-layers-base');
+    if (!overlays || !base) { setTimeout(injectWeatherCheckbox, 150); return; }
 
-    /* 天気情報 チェックボックス */
-    const sep = document.createElement('div');
-    sep.className = 'leaflet-control-layers-separator';
-    overlays.appendChild(sep);
-    const lbl = document.createElement('label');
-    lbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>天気情報</span>';
-    overlays.appendChild(lbl);
+    /* ベースマップ 見出し */
+    const baseLbl = document.createElement('div');
+    baseLbl.className = 'lc-section-label';
+    baseLbl.textContent = 'ベースマップ';
+    base.insertBefore(baseLbl, base.firstChild);
+
+    /* 農地レイヤ 見出し */
+    const farmLbl = document.createElement('div');
+    farmLbl.className = 'lc-section-label';
+    farmLbl.textContent = '農地レイヤ';
+    overlays.insertBefore(farmLbl, overlays.firstChild);
 
     /* 気象レイヤ セクション */
-    const sep2 = document.createElement('div');
-    sep2.className = 'leaflet-control-layers-separator';
-    overlays.appendChild(sep2);
+    const sep1 = document.createElement('div');
+    sep1.className = 'leaflet-control-layers-separator';
+    overlays.appendChild(sep1);
     const wxLayerLabel = document.createElement('div');
     wxLayerLabel.id = 'wxLayerLabel';
+    wxLayerLabel.className = 'lc-section-label';
     wxLayerLabel.textContent = '気象レイヤ';
     overlays.appendChild(wxLayerLabel);
     const wxLayersDiv = document.createElement('div');
@@ -617,6 +623,18 @@ document.addEventListener('DOMContentLoaded', () => {
       <label class="wx-chk-item" id="lblLAmedas"><input type="checkbox" id="chkLAmedas"><span class="ico">📡</span><span>アメダス</span></label>
     `;
     overlays.appendChild(wxLayersDiv);
+
+    /* 気象情報ダッシュボード チェックボックス */
+    const sep2 = document.createElement('div');
+    sep2.className = 'leaflet-control-layers-separator';
+    overlays.appendChild(sep2);
+    const dashLbl = document.createElement('div');
+    dashLbl.className = 'lc-section-label';
+    dashLbl.textContent = '気象情報ダッシュボード';
+    overlays.appendChild(dashLbl);
+    const lbl = document.createElement('label');
+    lbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>ダッシュボードを開く</span>';
+    overlays.appendChild(lbl);
 
     /* イベントリスナー */
     document.getElementById('chkWeather').addEventListener('change', function() {
