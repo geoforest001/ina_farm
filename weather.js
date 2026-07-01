@@ -818,6 +818,61 @@ document.addEventListener('DOMContentLoaded', () => {
     const base    = document.querySelector('.leaflet-control-layers-base');
     if (!overlays || !base) { setTimeout(injectWeatherCheckbox, 150); return; }
 
+    /* 住所検索ボックス */
+    const lcList = document.querySelector('.leaflet-control-layers-list');
+    if (lcList && !document.getElementById('addrSearchBox')) {
+      const searchWrap = document.createElement('div');
+      searchWrap.id = 'addrSearchBox';
+      searchWrap.innerHTML = `
+        <div class="addr-search-row">
+          <input type="text" id="addrInput" placeholder="住所を検索..." autocomplete="off" spellcheck="false">
+          <button id="addrBtn" title="検索">🔍</button>
+        </div>
+        <ul id="addrResults"></ul>
+        <div class="leaflet-control-layers-separator" style="margin:6px 0 0"></div>
+      `;
+      lcList.insertBefore(searchWrap, lcList.firstChild);
+
+      const addrInput = document.getElementById('addrInput');
+      const addrBtn   = document.getElementById('addrBtn');
+      const addrList  = document.getElementById('addrResults');
+
+      async function searchAddress() {
+        const q = addrInput.value.trim();
+        if (!q) return;
+        addrList.innerHTML = '<li class="addr-msg">検索中...</li>';
+        try {
+          const res  = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          addrList.innerHTML = '';
+          if (!data.length) {
+            addrList.innerHTML = '<li class="addr-msg">見つかりませんでした</li>';
+            return;
+          }
+          data.slice(0, 6).forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'addr-item';
+            li.textContent = item.properties.title;
+            li.addEventListener('click', () => {
+              const [lng, lat] = item.geometry.coordinates;
+              map.setView([lat, lng], 15);
+              addrList.innerHTML = '';
+              addrInput.value = item.properties.title;
+            });
+            addrList.appendChild(li);
+          });
+        } catch(e) {
+          addrList.innerHTML = '<li class="addr-msg">エラーが発生しました</li>';
+        }
+      }
+
+      addrBtn.addEventListener('click', searchAddress);
+      addrInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchAddress(); });
+      document.addEventListener('click', e => {
+        if (!searchWrap.contains(e.target)) addrList.innerHTML = '';
+      }, true);
+    }
+
     /* ベースマップ 見出し */
     const baseLbl = document.createElement('div');
     baseLbl.className = 'lc-section-label';
