@@ -384,29 +384,41 @@ body {
 .cw-source  { font-size: 9px; color: #aaa; text-align: right; }
 
 /* ─── ツールボックス ─────────────────────────────── */
-#toolbox {
-  position: fixed;
-  bottom: 28px;
-  right: 10px;
-  z-index: 9000;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+
+/* ===== ツールボックス (レイヤコントロール内) ===== */
+#tbLayers {
+  padding: 2px 0 4px;
 }
-#toolbox button {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.95);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.22);
-  cursor: pointer;
-  font-size: 22px;
+.tb-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: background 0.15s, transform 0.1s;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  margin: 2px 0;
+  background: #f5f7f5;
+  border: 1px solid #c8d8c8;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1e4d2b;
+  text-align: left;
+  transition: background 0.15s;
 }
-#toolbox button:hover { background: #e8f5ed; transform: scale(1.05); }
-#toolbox button.active { background: #e8f5ed; box-shadow: 0 0 0 2px #1e6e42; }
-#toolbox button.loading { opacity: 0.6; cursor: wait; }
+.tb-btn:hover {
+  background: #e0eee0;
+}
+.tb-btn:active {
+  background: #cce0cc;
+}
+.tb-btn .ico {
+  font-size: 15px;
+}
+.tb-btn.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.tb-btn.active {
+  background: #d4eed4;
+  border-color: #4caf50;
+}
