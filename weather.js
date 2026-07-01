@@ -1019,9 +1019,25 @@ document.addEventListener('DOMContentLoaded', () => {
               html: '<div style="background:#1e6e42;border:3px solid #fff;border-radius:50%;width:18px;height:18px;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>',
               iconSize: [18, 18], iconAnchor: [9, 9], className: ''
             })
-          }).addTo(map).bindPopup('📍 現在地').openPopup();
+          }).addTo(map).bindPopup('📍 現在地を取得中...').openPopup();
           btn.classList.remove('loading');
           btn.classList.add('active');
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&accept-language=ja`)
+            .then(r => r.json())
+            .then(d => {
+              const a = d.address || {};
+              const parts = [
+                a.province || a.state || '',
+                a.city || a.town || a.village || a.county || '',
+                a.quarter || a.suburb || a.neighbourhood || '',
+                a.road || ''
+              ].filter(Boolean);
+              const addr = parts.join(' ') || d.display_name || '';
+              if (currentLocationMarker) currentLocationMarker.setPopupContent(`📍 現在地<br><small>${addr}</small>`);
+            })
+            .catch(() => {
+              if (currentLocationMarker) currentLocationMarker.setPopupContent('📍 現在地');
+            });
         },
         () => {
           btn.classList.remove('loading');
