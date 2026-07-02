@@ -617,7 +617,7 @@ async function _startRainAnim() {
     _rainAnim.frames = [...obsFrames, ...fcFrames];
     _rainAnim.idx = 0;
     clearInterval(_rainAnim.frameTimer);
-    _rainAnim.frameTimer = setInterval(_stepRainAnim, 700);
+    _rainAnim.frameTimer = setInterval(_stepRainAnim, 1200);
     _stepRainAnim();
     if (lbl) lbl.style.borderColor = '';
   } catch(e) {
@@ -958,9 +958,16 @@ document.addEventListener('DOMContentLoaded', () => {
       overlays.appendChild(d);
     };
     mkStatus('wxRiver');
-    mkStatus('rainAnimStatus');
     mkStatus('wxKikendo');
     const wxAmedasDiv = document.createElement('div'); wxAmedasDiv.id = 'wxAmedas'; overlays.appendChild(wxAmedasDiv);
+
+    /* 雨雲タイムスタンプ：地図上部中央に表示 */
+    if (!document.getElementById('rainAnimStatus')) {
+      const bar = document.createElement('div');
+      bar.id = 'rainAnimStatus';
+      bar.style.cssText = 'display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;background:rgba(0,0,0,0.65);color:#fff;padding:5px 16px;border-radius:20px;font-size:13px;pointer-events:none;white-space:nowrap;';
+      map.getContainer().appendChild(bar);
+    }
 
     /* 気象情報ダッシュボード チェックボックス */
     const sep2 = document.createElement('div');
