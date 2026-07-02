@@ -35,6 +35,8 @@ const naganoCsMap = L.tileLayer(
 );
 
 gsiStandard.addTo(map);
+gsiAirPhoto.addTo(map); gsiAirPhoto.setOpacity(0);
+naganoCsMap.addTo(map); naganoCsMap.setOpacity(0);
 
 const FARM_POLYGON_URL = "https://geoforest001.github.io/ina_farm_test/data/%E8%BE%B2%E5%9C%B0%E7%AD%86%E3%83%9D%E3%83%AA%E3%82%B4%E3%83%B3.pmtiles";
 const PIPELINE_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%91%E3%82%A4%E3%83%97%E3%83%A9%E3%82%A4%E3%83%B3.pmtiles";
@@ -143,11 +145,7 @@ const surveyTiles = protomapsL.leafletLayer({
 });
 surveyTiles.addTo(map);
 
-const baseLayers = {
-  "地理院標準地図": gsiStandard,
-  "地理院航空写真": gsiAirPhoto,
-  "長野県CS立体図": naganoCsMap
-};
+const baseLayers = {};
 
 const overlays = {
   "農地筆ポリゴン": farmPolygonTiles,
