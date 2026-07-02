@@ -13,7 +13,7 @@ const gsiStandard = L.tileLayer(
   {
     attribution: gsiAttribution,
     maxZoom: 18,
-    className: "grayscale-layer"
+    className: "grayscale-layer bm-multiply"
   }
 );
 
@@ -21,7 +21,8 @@ const gsiAirPhoto = L.tileLayer(
   "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
   {
     attribution: gsiAttribution,
-    maxZoom: 18
+    maxZoom: 18,
+    className: "bm-multiply"
   }
 );
 
@@ -30,7 +31,8 @@ const naganoCsMap = L.tileLayer(
   {
     attribution:
       '<a href="https://www.geospatial.jp/ckan/dataset/nagano-csmap">長野県CS立体図</a>',
-    maxZoom: 18
+    maxZoom: 18,
+    className: "bm-multiply"
   }
 );
 
