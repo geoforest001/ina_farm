@@ -609,7 +609,7 @@ async function _startRainAnim() {
     const latest = arr[0];
     const latestBt = typeof latest === 'string' ? latest : (latest.basetime || latest.validtime);
     const btMs = _parseJmaTime(latestBt);
-    const obsFrames = arr.slice(0,12).map(e => {
+    const obsFrames = arr.map(e => {
       const t = typeof e === 'string' ? e : (e.basetime || e.validtime);
       return {bt:t, vt:t};
     }).reverse();
