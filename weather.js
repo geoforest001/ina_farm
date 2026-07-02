@@ -873,11 +873,56 @@ document.addEventListener('DOMContentLoaded', () => {
       }, true);
     }
 
-    /* ベースマップ 見出し */
+    /* ベースマップ 見出し + 透過スライダー */
     const baseLbl = document.createElement('div');
     baseLbl.className = 'lc-section-label';
     baseLbl.textContent = 'ベースマップ';
     base.insertBefore(baseLbl, base.firstChild);
+
+    const bmDefs = [
+      { id: 'bmStd', label: '地理院標準地図', varName: 'gsiStandard',  defVal: 1.0 },
+      { id: 'bmAir', label: '地理院航空写真', varName: 'gsiAirPhoto',  defVal: 0.0 },
+      { id: 'bmCs',  label: '長野県CS立体図', varName: 'naganoCsMap',  defVal: 0.0 },
+    ];
+    bmDefs.forEach(({ id, label, varName, defVal }) => {
+      const item = document.createElement('div');
+      item.className = 'bm-item';
+      item.innerHTML = `
+        <div class="bm-row">
+          <input type="checkbox" id="${id}" ${defVal > 0 ? 'checked' : ''}>
+          <label for="${id}">${label}</label>
+          <span class="bm-pct" id="${id}Pct">${Math.round(defVal * 100)}%</span>
+        </div>
+        <input type="range" class="bm-slider" id="${id}Slider"
+               min="0" max="1" step="0.05" value="${defVal}">
+      `;
+      base.appendChild(item);
+
+      const chk    = document.getElementById(id);
+      const slider = document.getElementById(id + 'Slider');
+      const pct    = document.getElementById(id + 'Pct');
+
+      function applyOpacity(val) {
+        const lyr = window[varName];
+        if (!lyr) return;
+        lyr.setOpacity(val);
+        pct.textContent = Math.round(val * 100) + '%';
+        chk.checked = val > 0;
+        slider.value = val;
+      }
+
+      chk.addEventListener('change', () => {
+        applyOpacity(chk.checked ? (parseFloat(slider.value) || 1.0) : 0);
+      });
+      slider.addEventListener('input', () => {
+        applyOpacity(parseFloat(slider.value));
+      });
+    });
+
+    /* ネイティブセパレータの代替 */
+    const bmSep = document.createElement('div');
+    bmSep.className = 'leaflet-control-layers-separator';
+    base.appendChild(bmSep);
 
     /* 農地レイヤ 見出し */
     const farmLbl = document.createElement('div');
