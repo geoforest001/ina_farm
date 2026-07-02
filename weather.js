@@ -607,7 +607,8 @@ async function _startRainAnim() {
     const arr = await res.json();
     if (!Array.isArray(arr) || !arr.length) throw new Error('フレームなし');
 
-    const nowMs = Date.now();
+    const JST_OFFSET = 9 * 60 * 60 * 1000;
+    const nowMs = Date.now() + JST_OFFSET;
     const minus3h = nowMs - 3 * 60 * 60 * 1000;
     const plus6h  = nowMs + 6 * 60 * 60 * 1000;
 
