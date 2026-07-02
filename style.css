@@ -510,3 +510,8 @@ body {
   accent-color: #4caf50;
   cursor: pointer;
 }
+
+/* ===== ベースマップ 乗算合成 ===== */
+.bm-multiply {
+  mix-blend-mode: multiply;
+}
