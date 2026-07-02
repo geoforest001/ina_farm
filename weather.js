@@ -602,19 +602,32 @@ async function _startRainAnim() {
   const lbl = document.getElementById('lblLRainAnim');
   if (status) { status.textContent = '🌀 取得中...'; status.style.display = 'block'; }
   try {
-    const res = await fetch('https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json',{cache:'no-store'});
+    const res = await fetch('https://www.jma.go.jp/bosai/jmatile/data/rasrf/targetTimes.json',{cache:'no-store'});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const arr = await res.json();
     if (!Array.isArray(arr) || !arr.length) throw new Error('フレームなし');
-    const latest = arr[0];
-    const latestBt = typeof latest === 'string' ? latest : (latest.basetime || latest.validtime);
-    const btMs = _parseJmaTime(latestBt);
-    const obsFrames = arr.map(e => {
-      const t = typeof e === 'string' ? e : (e.basetime || e.validtime);
-      return {bt:t, vt:t};
-    }).reverse();
-    const fcFrames = Array.from({length:12}, (_,i) => ({bt:latestBt, vt:_fmtJmaTime(btMs+(i+1)*5*60000)}));
-    _rainAnim.frames = [...obsFrames, ...fcFrames];
+
+    const nowMs = Date.now();
+    const minus3h = nowMs - 3 * 60 * 60 * 1000;
+    const plus6h  = nowMs + 6 * 60 * 60 * 1000;
+
+    /* validtime ごとに最新 basetime を選択 */
+    const byVt = {};
+    for (const e of arr) {
+      const vtMs = _parseJmaTime(e.validtime);
+      if (vtMs >= minus3h && vtMs <= plus6h) {
+        if (!byVt[e.validtime] || e.basetime > byVt[e.validtime].basetime) {
+          byVt[e.validtime] = e;
+        }
+      }
+    }
+    const frames = Object.values(byVt)
+      .sort((a, b) => _parseJmaTime(a.validtime) - _parseJmaTime(b.validtime))
+      .map(e => ({bt: e.basetime, vt: e.validtime}));
+
+    if (!frames.length) throw new Error('フレームなし');
+    _rainAnim.frames = frames;
+    _rainAnim.nowMs = nowMs;
     _rainAnim.idx = 0;
     clearInterval(_rainAnim.frameTimer);
     _rainAnim.frameTimer = setInterval(_stepRainAnim, 1200);
@@ -629,17 +642,24 @@ async function _startRainAnim() {
 function _stepRainAnim() {
   if (!_rainAnim.on || !_rainAnim.frames.length) return;
   const {bt, vt} = _rainAnim.frames[_rainAnim.idx];
-  const url = `https://www.jma.go.jp/bosai/jmatile/data/nowc/${bt}/none/${vt}/surf/hrpns/{z}/{x}/{y}.png`;
+  const url = `https://www.jma.go.jp/bosai/jmatile/data/rasrf/${bt}/none/${vt}/surf/rasrf/{z}/{x}/{y}.png`;
   const newLayer = L.tileLayer(url, {opacity:0.65, maxNativeZoom:10, maxZoom:22, attribution:'© 気象庁'});
   newLayer.addTo(map);
   if (_rainAnim.layer) map.removeLayer(_rainAnim.layer);
   _rainAnim.layer = newLayer;
   const status = document.getElementById('rainAnimStatus');
   if (status) {
-    const diffMin = Math.round((_parseJmaTime(vt) - _parseJmaTime(bt)) / 60000);
+    const vtMs = _parseJmaTime(vt);
+    const nowMs = _rainAnim.nowMs || Date.now();
+    const diffMin = Math.round((vtMs - nowMs) / 60000);
     const hhmm = `${vt.slice(8,10)}:${vt.slice(10,12)}`;
-    status.textContent = diffMin === 0 ? `🌀 ${hhmm} 観測` : `🌀 ${hhmm} (+${diffMin}分 予測)`;
-    status.style.color = diffMin === 0 ? '#aaa' : '#7ec8e3';
+    if (diffMin <= 0) {
+      status.textContent = `🌀 ${hhmm} (${Math.abs(diffMin)}分前)`;
+      status.style.color = '#aaa';
+    } else {
+      status.textContent = `🌀 ${hhmm} (+${diffMin}分 予測)`;
+      status.style.color = '#7ec8e3';
+    }
   }
   _rainAnim.idx = (_rainAnim.idx + 1) % _rainAnim.frames.length;
 }
