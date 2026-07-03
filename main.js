@@ -61,6 +61,17 @@ const farmPolygonTiles = protomapsL.leafletLayer({
 });
 farmPolygonTiles.addTo(map);
 
+/* 農地ピン検索用レイヤ（透明・検索専用） */
+let farmPinData = null;
+let farmPinLayer = null;
+fetch('data/farm_pins.json')
+  .then(r => r.json())
+  .then(data => {
+    farmPinData = data;
+    farmPinLayer = L.geoJSON(null, { pointToLayer: () => L.circleMarker([0,0], {radius:0, opacity:0, fillOpacity:0}) });
+    farmPinLayer.addTo(map);
+  });
+
 const pipelineTiles = protomapsL.leafletLayer({
   url: PIPELINE_URL,
   maxDataZoom: 15,
