@@ -40,15 +40,15 @@ gsiStandard.addTo(map);
 gsiAirPhoto.addTo(map); gsiAirPhoto.setOpacity(0);
 naganoCsMap.addTo(map); naganoCsMap.setOpacity(0);
 
-const FARM_POLYGON_URL = "https://geoforest001.github.io/ina_farm_test/data/%E8%BE%B2%E5%9C%B0%E7%AD%86%E3%83%9D%E3%83%AA%E3%82%B4%E3%83%B3.pmtiles";
+const FARM_POLYGON_URL = "https://geoforest001.github.io/ina_farm/data/farm_polygon.pmtiles";
 const PIPELINE_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%91%E3%82%A4%E3%83%97%E3%83%A9%E3%82%A4%E3%83%B3.pmtiles";
 
 const farmPolygonTiles = protomapsL.leafletLayer({
   url: FARM_POLYGON_URL,
-  maxDataZoom: 13,
+  maxDataZoom: 16,
   paintRules: [
     {
-      dataLayer: "農地筆ポリゴン2025",
+      dataLayer: "農地筆ポリゴン",
       symbolizer: new protomapsL.PolygonSymbolizer({
         fill: "rgb(240,210,0)",
         opacity: 0.3,
