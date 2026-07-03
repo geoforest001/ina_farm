@@ -71,6 +71,28 @@ fetch('data/farm_pins.json')
     farmPinLayer = L.geoJSON(null, { pointToLayer: () => L.circleMarker([0,0], {radius:0, opacity:0, fillOpacity:0}) });
     farmPinLayer.addTo(map);
   });
+/* 農地筆ポリゴン クリックで地番ポップアップ */
+map.on('click', function(e) {
+  if (!farmPinData || map.getZoom() < 15) return;
+  const lat = e.latlng.lat;
+  const lng = e.latlng.lng;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  let nearest = null, minDist = Infinity;
+  for (const d of farmPinData) {
+    const dlat = d.y - lat;
+    const dlng = (d.x - lng) * cosLat;
+    const dist = dlat * dlat + dlng * dlng;
+    if (dist < minDist) { minDist = dist; nearest = d; }
+  }
+  /* 約50m以内（0.00045度²）のみ表示 */
+  if (nearest && minDist < 0.00045 * 0.00045) {
+    L.popup()
+      .setLatLng([nearest.y, nearest.x])
+      .setContent(`📍 ${nearest.a}`)
+      .openOn(map);
+  }
+});
+
 
 const pipelineTiles = protomapsL.leafletLayer({
   url: PIPELINE_URL,
