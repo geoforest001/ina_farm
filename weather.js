@@ -904,7 +904,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <button id="farmBtn">検索</button>
         </div>
         <ul id="farmResults"></ul>`;
-      lcList.insertBefore(farmWrap, lcList.firstChild);
+      const _addrBox = document.getElementById('addrSearchBox');
+      if (_addrBox && _addrBox.parentNode) {
+        _addrBox.parentNode.insertBefore(farmWrap, _addrBox.nextSibling);
+      } else {
+        lcList.appendChild(farmWrap);
+      }
 
       const farmInput = document.getElementById('farmInput');
       const farmBtn   = document.getElementById('farmBtn');
