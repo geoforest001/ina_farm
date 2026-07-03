@@ -894,6 +894,61 @@ document.addEventListener('DOMContentLoaded', () => {
       }, true);
     }
 
+    /* 農地検索ボックス */
+    if (lcList && !document.getElementById('farmSearchBox')) {
+      const farmWrap = document.createElement('div');
+      farmWrap.id = 'farmSearchBox';
+      farmWrap.innerHTML = `
+        <div class="addr-search-row">
+          <input type="text" id="farmInput" placeholder="農地を検索（地番）..." autocomplete="off" spellcheck="false">
+          <button id="farmBtn">検索</button>
+        </div>
+        <ul id="farmResults"></ul>`;
+      lcList.insertBefore(farmWrap, lcList.firstChild);
+
+      const farmInput = document.getElementById('farmInput');
+      const farmBtn   = document.getElementById('farmBtn');
+      const farmList  = document.getElementById('farmResults');
+
+      let farmMarker = null;
+
+      function searchFarm() {
+        const q = farmInput.value.trim();
+        farmList.innerHTML = '';
+        if (!q || !farmPinData) return;
+        const hits = farmPinData.filter(d => d.a && d.a.includes(q)).slice(0, 20);
+        if (!hits.length) {
+          const li = document.createElement('li');
+          li.className = 'addr-item';
+          li.textContent = '該当なし';
+          farmList.appendChild(li);
+          return;
+        }
+        hits.forEach(d => {
+          const li = document.createElement('li');
+          li.className = 'addr-item';
+          li.textContent = d.a;
+          li.addEventListener('click', () => {
+            map.setView([d.y, d.x], 17);
+            if (farmMarker) map.removeLayer(farmMarker);
+            farmMarker = L.circleMarker([d.y, d.x], {
+              radius: 8, color: '#e53935', fillColor: '#e53935',
+              fillOpacity: 0.8, weight: 2
+            }).addTo(map).bindPopup(`📍 ${d.a}`).openPopup();
+            farmList.innerHTML = '';
+            farmInput.value = d.a;
+          });
+          farmList.appendChild(li);
+        });
+      }
+
+      farmBtn.addEventListener('click', searchFarm);
+      farmInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchFarm(); });
+      document.addEventListener('click', e => {
+        if (!farmWrap.contains(e.target)) farmList.innerHTML = '';
+      }, true);
+    }
+
     /* ベースマップ 見出し + 透過スライダー */
     const baseLbl = document.createElement('div');
     baseLbl.className = 'lc-section-label';
