@@ -110,11 +110,11 @@ const pipelineTiles = protomapsL.leafletLayer({
 });
 pipelineTiles.addTo(map);
 
-const WATERWAY_URL = "https://geoforest001.github.io/ina_farm_test/data/%E6%B0%B4%E8%B7%AF.pmtiles";
+const WATERWAY_URL = "https://geoforest001.github.io/ina_farm/data/suiro.pmtiles";
 
 const waterwayTiles = protomapsL.leafletLayer({
   url: WATERWAY_URL,
-  maxDataZoom: 15,
+  maxDataZoom: 16,
   paintRules: [
     {
       dataLayer: "水路",
