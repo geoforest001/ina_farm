@@ -96,7 +96,7 @@ map.on('click', function(e) {
 
 const pipelineTiles = protomapsL.leafletLayer({
   url: PIPELINE_URL,
-  maxDataZoom: 15,
+  maxDataZoom: 16,
   paintRules: [
     {
       dataLayer: "02パイプライン_Layer",
