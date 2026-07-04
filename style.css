@@ -554,29 +554,7 @@ body {
 }
 #farmResults:empty { display: none; }
 
-/* ===== 活動ツールボックスパネル ===== */
-#precPanel {
-  position: fixed;
-  top: 120px;
-  left: 10px;
-  width: 210px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 14px rgba(0,0,0,0.18);
-  z-index: 1200;
-  font-size: 13px;
-  color: #1a3a4c;
-  user-select: none;
-  padding-bottom: 8px;
-}
-#precTitle {
-  padding: 8px 12px 7px;
-  font-weight: bold;
-  font-size: 13px;
-  background: #e4eef8;
-  border-radius: 10px 10px 0 0;
-  border-bottom: 1px solid #d0dde8;
-}
+/* ===== 解析ツールボックス（レイヤーコントロール内） ===== */
 .prec-tool-row {
   padding: 8px 12px 4px;
 }

@@ -1010,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlays.appendChild(sep3);
     const tbLbl = document.createElement('div');
     tbLbl.className = 'lc-section-label';
-    tbLbl.textContent = 'ツールボックス';
+    tbLbl.textContent = '活動用ツールボックス';
     overlays.appendChild(tbLbl);
     const tbDiv = document.createElement('div');
     tbDiv.id = 'tbLayers';

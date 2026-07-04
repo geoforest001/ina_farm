@@ -22,7 +22,6 @@
   // ── 状態 ─────────────────────────────────────
   let precipLayer = L.layerGroup();
   let stations    = null; // {code, name, lat, lng}[]
-  let panelOpen   = false;
   let loading     = false;
 
   // ── 色スケール ────────────────────────────────
@@ -197,38 +196,6 @@
     return d.toISOString().slice(0, 10);
   }
 
-  // ── 活動ツールボックスパネル ──────────────────
-  function buildPanel() {
-    const panel = document.createElement('div');
-    panel.id = 'precPanel';
-    panel.style.display = 'none';
-    panel.innerHTML = `
-      <div id="precTitle">🔬 活動ツールボックス</div>
-      <div class="prec-tool-row" style="color:#888;font-size:11px;">
-        （今後の機能を追加予定）
-      </div>
-    `;
-    document.body.appendChild(panel);
-  }
-
-  // 地図ボタン（🔬アイコン）
-  function addMapButton() {
-    const ctrl = L.control({ position: 'topleft' });
-    ctrl.onAdd = function () {
-      const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-      div.innerHTML = '<button id="precToggle" title="活動ツールボックス" style="width:30px;height:30px;font-size:15px;cursor:pointer;background:#fff;border:none;line-height:30px;">🔬</button>';
-      L.DomEvent.disableClickPropagation(div);
-      div.querySelector('#precToggle').addEventListener('click', () => {
-        const p = document.getElementById('precPanel');
-        if (!p) return;
-        panelOpen = !panelOpen;
-        p.style.display = panelOpen ? 'block' : 'none';
-      });
-      return div;
-    };
-    ctrl.addTo(map);
-  }
-
   // ── 解析ツールボックス → レイヤーコントロールに追加 ──
   function addPrecToLayerControl() {
     const overlays = document.querySelector('.leaflet-control-layers-overlays');
@@ -248,7 +215,7 @@
     section.innerHTML = `
       <div class="prec-tool-row">
         <label class="prec-chk-label">
-          <input type="checkbox" id="precChk"> ☔ 降水量メッシュ
+          <input type="checkbox" id="precChk"> ☔ 過去10日間降水量
         </label>
       </div>
       <div id="precOptions" style="display:none">
@@ -302,8 +269,6 @@
   }
 
   window.addEventListener('load', () => {
-    buildPanel();
-    addMapButton();
     addPrecToLayerControl();
   });
 })();
