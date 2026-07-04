@@ -554,121 +554,106 @@ body {
 }
 #farmResults:empty { display: none; }
 
-/* ===== 降水量メッシュパネル ===== */
+/* ===== 解析ツールボックスパネル ===== */
 #precPanel {
   position: fixed;
-  top: 60px;
-  left: 50px;
-  width: 220px;
+  top: 120px;
+  left: 10px;
+  width: 210px;
   background: #fff;
   border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  box-shadow: 0 2px 14px rgba(0,0,0,0.18);
   z-index: 1200;
   font-size: 13px;
-  color: #1a3a5c;
+  color: #1a3a4c;
   user-select: none;
+  padding-bottom: 8px;
 }
-#precHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px 6px;
-  background: #e8f0fe;
-  border-radius: 10px 10px 0 0;
+#precTitle {
+  padding: 8px 12px 7px;
   font-weight: bold;
   font-size: 13px;
+  background: #e4eef8;
+  border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid #d0dde8;
 }
-#precHeader button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  color: #555;
-  padding: 0 2px;
+.prec-tool-row {
+  padding: 8px 12px 4px;
 }
-#precBody {
-  padding: 10px;
-}
-.prec-drop-zone {
-  border: 2px dashed #90b4e0;
-  border-radius: 7px;
-  padding: 14px 8px;
-  text-align: center;
-  cursor: pointer;
-  background: #f4f8ff;
-  transition: background 0.2s;
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-.prec-drop-zone:hover, .prec-drop-zone.drag-over {
-  background: #ddeeff;
-  border-color: #4488cc;
-}
-.prec-drop-sub {
-  font-size: 11px;
-  color: #888;
-  margin-top: 3px;
-}
-.prec-row {
+.prec-chk-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 8px;
-}
-.prec-row label {
-  font-size: 12px;
-  min-width: 28px;
-  color: #555;
-}
-.prec-row select {
-  flex: 1;
-  padding: 4px 6px;
-  border: 1px solid #c0d0e0;
-  border-radius: 5px;
-  font-size: 12px;
-}
-.prec-btn-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.prec-btn-row button {
-  flex: 1;
-  padding: 5px 4px;
-  border: 1px solid #c0d0e0;
-  border-radius: 5px;
-  background: #f0f6ff;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
 }
-.prec-btn-row button:hover:not(:disabled) { background: #d8eaff; }
-.prec-btn-row button:disabled { opacity: 0.45; cursor: default; }
+.prec-chk-label input[type=checkbox] {
+  width: 15px; height: 15px; cursor: pointer;
+}
+#precOptions {
+  padding: 6px 12px 0;
+}
+.prec-date-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.prec-date-row label {
+  font-size: 11px;
+  color: #666;
+  min-width: 24px;
+}
+.prec-date-row input[type=date] {
+  flex: 1;
+  padding: 4px 5px;
+  border: 1px solid #c0d4e4;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.prec-note-small {
+  font-size: 10px;
+  color: #999;
+  margin-bottom: 7px;
+}
+#precRunBtn {
+  width: 100%;
+  padding: 6px;
+  background: #4a90d9;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 7px;
+}
+#precRunBtn:hover { background: #3070b8; }
 #precStatus {
   font-size: 11px;
   color: #555;
-  margin-bottom: 8px;
   min-height: 16px;
   line-height: 1.4;
+  margin-bottom: 8px;
 }
-#precLegend { margin-bottom: 6px; }
-.prec-leg-title {
+#precLegend { border-top: 1px solid #eee; padding-top: 7px; }
+.plg-title {
   font-size: 11px;
   color: #888;
   margin-bottom: 4px;
 }
-.prec-leg-row {
+.plg-row {
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 11px;
   margin-bottom: 2px;
 }
-.prec-sw {
+.plg-sw {
   display: inline-block;
   width: 14px;
   height: 10px;
   border-radius: 2px;
-  border: 1px solid rgba(0,0,0,0.15);
+  border: 1px solid rgba(0,0,0,0.12);
   flex-shrink: 0;
 }
 .prec-note {
