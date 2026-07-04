@@ -215,7 +215,7 @@
     section.innerHTML = `
       <div class="prec-tool-row">
         <label class="prec-chk-label">
-          <input type="checkbox" id="precChk"> ☔ 過去10日間降水量
+          <input type="checkbox" id="precChk"> ☔ 期間合計降水量
         </label>
       </div>
       <div id="precOptions" style="display:none">
