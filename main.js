@@ -41,7 +41,7 @@ gsiAirPhoto.addTo(map); gsiAirPhoto.setOpacity(0);
 naganoCsMap.addTo(map); naganoCsMap.setOpacity(0);
 
 const FARM_POLYGON_URL = "https://geoforest001.github.io/ina_farm/data/farm_polygon.pmtiles";
-const PIPELINE_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%91%E3%82%A4%E3%83%97%E3%83%A9%E3%82%A4%E3%83%B3.pmtiles";
+const PIPELINE_URL = "https://geoforest001.github.io/ina_farm/data/pipeline.pmtiles";
 
 const farmPolygonTiles = protomapsL.leafletLayer({
   url: FARM_POLYGON_URL,
@@ -96,7 +96,7 @@ map.on('click', function(e) {
 
 const pipelineTiles = protomapsL.leafletLayer({
   url: PIPELINE_URL,
-  maxDataZoom: 16,
+  maxDataZoom: 20,
   paintRules: [
     {
       dataLayer: "02パイプライン_Layer",
