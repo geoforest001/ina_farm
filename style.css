@@ -532,6 +532,17 @@ body {
   border-color: #4caf50;
   box-shadow: 0 0 0 2px rgba(76,175,80,0.15);
 }
+#farmClearBtn {
+  padding: 4px 6px;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  color: #666;
+}
+#farmClearBtn:hover { background: #e0e0e0; }
 #farmBtn {
   padding: 4px 7px;
   background: #e8f5e9;

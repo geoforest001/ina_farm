@@ -228,7 +228,10 @@
           <input type="date" id="precEnd" min="${minDate()}" max="${maxDate()}" value="${defaultStart()}">
         </div>
         <div class="prec-note-small">※ AMeDAS 直近10日のみ対応</div>
-        <button id="precRunBtn">表示</button>
+        <div style="display:flex;gap:6px;">
+          <button id="precRunBtn" style="flex:1">表示</button>
+          <button id="precClearBtn" style="flex:0 0 auto;padding:6px 10px;background:#e0e0e0;color:#333;border:none;border-radius:6px;font-size:13px;cursor:pointer;">クリア</button>
+        </div>
         <div id="precStatus">日付を選んで「表示」を押してください</div>
         <div id="precLegend">
           <div class="plg-title">降水量（期間合計）</div>
@@ -265,6 +268,14 @@
     document.getElementById('precRunBtn').addEventListener('click', () => {
       if (!validateDates()) return;
       run(document.getElementById('precStart').value, document.getElementById('precEnd').value);
+    });
+
+    document.getElementById('precClearBtn').addEventListener('click', () => {
+      precipLayer.clearLayers();
+      precipLayer.remove();
+      document.getElementById('precChk').checked = false;
+      document.getElementById('precOptions').style.display = 'none';
+      setStatus('日付を選んで「表示」を押してください');
     });
   }
 

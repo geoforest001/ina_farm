@@ -847,6 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
       farmWrap.innerHTML = `
         <div class="addr-search-row">
           <input type="text" id="farmInput" placeholder="農地を検索（地番）..." autocomplete="off" spellcheck="false">
+          <button id="farmClearBtn" title="クリア">×</button>
           <button id="farmBtn">検索</button>
         </div>
         <ul id="farmResults"></ul>
@@ -888,6 +889,14 @@ document.addEventListener('DOMContentLoaded', () => {
           farmList.appendChild(li);
         });
       }
+
+      const farmClearBtn = document.getElementById('farmClearBtn');
+      farmClearBtn.addEventListener('click', () => {
+        farmInput.value = '';
+        farmList.innerHTML = '';
+        if (farmMarker) { map.removeLayer(farmMarker); farmMarker = null; }
+        farmInput.focus();
+      });
 
       farmBtn.addEventListener('click', searchFarm);
       farmInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchFarm(); });
