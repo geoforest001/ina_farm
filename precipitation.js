@@ -44,7 +44,7 @@
     const tbl = await r.json();
     stations = [];
     for (const [code, info] of Object.entries(tbl)) {
-      if (!info.rain) continue;
+      if (!info.lat || !info.lon) continue;
       const lat = info.lat[0] + info.lat[1] / 60;
       const lng = info.lon[0] + info.lon[1] / 60;
       if (lat >= AREA.latMin && lat <= AREA.latMax &&
@@ -56,37 +56,36 @@
     return stations;
   }
 
-  // ── 1日分の降水量（mm）を取得 ─────────────────
-  async function fetchDayRain(code, dateStr) {
-    // 1時間ファイルを並列取得して precipitation1h を合計
-    const [y, m, d] = dateStr.split('-');
-    const ymd = `${y}${m}${d}`;
-    const reqs = [];
-    for (let hh = 1; hh <= 24; hh++) {
-      const h = String(hh).padStart(2, '0');
-      reqs.push(
-        fetch(`https://www.jma.go.jp/bosai/amedas/data/point/${code}/${ymd}_${h}0000.json`, { cache: 'no-store' })
-          .then(r => r.ok ? r.json() : null)
-          .catch(() => null)
-      );
-    }
-    const results = await Promise.all(reqs);
-    let total = 0, found = false;
-    for (const data of results) {
-      if (!data) continue;
-      // 各10分データの precipitation1h（その時刻の正時からの積算値）
-      // 最後のキーの値を使用
-      const entries = Object.values(data);
-      for (const entry of entries) {
-        const v = entry?.precipitation1h;
+  // ── 1日分のマップデータを取得し観測点ごとの合計を返す ──
+  // /data/map/{YYYYMMDDHHMMSS}.json を時別に取得（全観測点一括）
+  async function fetchDayTotals(dateStr) {
+    const ymd = dateStr.replace(/-/g, '');
+    // 翌日00:00は当日23:00-24:00の1時間分
+    const next = new Date(dateStr + 'T00:00:00+09:00');
+    next.setDate(next.getDate() + 1);
+    const nextYmd = next.toISOString().slice(0, 10).replace(/-/g, '');
+
+    const timestamps = [];
+    for (let h = 1; h <= 23; h++) timestamps.push(`${ymd}${String(h).padStart(2,'0')}0000`);
+    timestamps.push(`${nextYmd}000000`);
+
+    const maps = await Promise.all(timestamps.map(ts =>
+      fetch(`https://www.jma.go.jp/bosai/amedas/data/map/${ts}.json`, { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    ));
+
+    const totals = {};
+    for (const mapData of maps) {
+      if (!mapData) continue;
+      for (const s of stations) {
+        const v = mapData[s.code]?.precipitation1h;
         if (Array.isArray(v) && v[0] != null) {
-          total += parseFloat(v[0]);
-          found = true;
-          break; // 1時間ファイルごとに1値
+          totals[s.code] = (totals[s.code] || 0) + parseFloat(v[0]);
         }
       }
     }
-    return found ? +total.toFixed(1) : null;
+    return totals; // { code: mm, ... }
   }
 
   // ── IDW補間 ───────────────────────────────────
@@ -145,28 +144,22 @@
       const sts = await loadStations();
       const dates = dateBetween(startDate, endDate);
 
-      setStatus(`データ取得中 (0/${dates.length}日)...`, true);
-
-      // 日付ごとに集計、最終的に合計
-      const totals = {}; // code → total mm
+      const totals = {}; // code → total mm (全日合計)
       sts.forEach(s => { totals[s.code] = 0; });
 
       for (let di = 0; di < dates.length; di++) {
-        const date = dates[di];
-        setStatus(`データ取得中 (${di + 1}/${dates.length}日: ${date})...`, true);
-
-        await Promise.all(sts.map(async s => {
-          const v = await fetchDayRain(s.code, date);
-          if (v != null) totals[s.code] += v;
-        }));
+        setStatus(`データ取得中 (${di + 1}/${dates.length}日: ${dates[di]})...`, true);
+        const dayTotals = await fetchDayTotals(dates[di]);
+        for (const s of sts) {
+          if (dayTotals[s.code] != null) totals[s.code] += dayTotals[s.code];
+        }
       }
 
-      const stWithVal = sts
-        .filter(s => totals[s.code] > 0 || Object.values(totals).some(v => v > 0))
-        .map(s => ({ ...s, value: totals[s.code] }));
+      const stWithVal = sts.map(s => ({ ...s, value: +(totals[s.code] || 0).toFixed(1) }));
+      const hasData = stWithVal.some(s => s.value > 0);
 
-      if (!stWithVal.length) {
-        setStatus('データが取得できませんでした（期間が古すぎる可能性があります）');
+      if (!hasData) {
+        setStatus('データが取得できませんでした（期間が古すぎるか降水量0の可能性があります）');
         loading = false;
         return;
       }
@@ -179,7 +172,7 @@
       setStatus(`表示中: ${label}`);
     } catch (e) {
       console.error(e);
-      setStatus('エラーが発生しました');
+      setStatus('エラーが発生しました: ' + e.message);
     }
     loading = false;
   }
