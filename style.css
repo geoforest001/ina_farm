@@ -554,7 +554,7 @@ body {
 }
 #farmResults:empty { display: none; }
 
-/* ===== 解析ツールボックスパネル ===== */
+/* ===== 活動ツールボックスパネル ===== */
 #precPanel {
   position: fixed;
   top: 120px;
@@ -663,3 +663,9 @@ body {
   border-top: 1px solid #eee;
   padding-top: 6px;
 }
+
+/* レイヤーコントロール内 解析ツールボックス */
+#precSection .prec-tool-row { padding: 4px 0 2px; }
+#precSection #precOptions   { padding: 4px 0 0; }
+#precSection .prec-date-row input[type=date] { width: 100%; min-width: 0; }
+#precSection #precRunBtn    { margin-top: 2px; }
