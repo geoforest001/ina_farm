@@ -1,223 +1,293 @@
 (function () {
   'use strict';
 
-  let precipGroup = L.layerGroup();
-  let loadedDate  = '';
-  let allRows     = []; // [{date, lat, lng, value}]
-  let dateList    = []; // ユニーク日付リスト
+  // ── 定数 ─────────────────────────────────────
+  // 伊那市周辺 1km(0.01°)格子
+  const GRID = (function () {
+    const pts = [];
+    for (let la = 35.66; la <= 35.98; la = +(la + 0.01).toFixed(2)) {
+      for (let lo = 137.82; lo <= 138.14; lo = +(lo + 0.01).toFixed(2)) {
+        pts.push({ lat: la, lng: lo });
+      }
+    }
+    return pts;
+  })();
+  const CELL = 0.01; // 格子間隔(°)
+  const IDW_P = 2;   // IDWべき乗数
+  const MAX_DAYS = 7;
 
-  // ── 降水量 → 色 ───────────────────────────
-  function mmColor(mm) {
-    if (mm == null || isNaN(mm)) return { fill: 'rgba(180,180,180,0.3)', stroke: '#999' };
-    if (mm <  1)  return { fill: 'rgba(230,245,255,0.5)', stroke: '#bbd' };
-    if (mm < 10)  return { fill: 'rgba(100,180,255,0.55)', stroke: '#66b' };
-    if (mm < 30)  return { fill: 'rgba(0,120,220,0.60)',   stroke: '#048' };
-    if (mm < 60)  return { fill: 'rgba(0,50,180,0.65)',    stroke: '#024' };
-    if (mm < 120) return { fill: 'rgba(100,0,180,0.70)',   stroke: '#407' };
-    if (mm < 200) return { fill: 'rgba(180,0,0,0.72)',     stroke: '#900' };
-    return           { fill: 'rgba(220,50,0,0.80)',        stroke: '#b20' };
+  // AMeDAS対象エリア（広めにとってIDW精度を上げる）
+  const AREA = { latMin: 35.3, latMax: 36.3, lngMin: 137.4, lngMax: 138.7 };
+
+  // ── 状態 ─────────────────────────────────────
+  let precipLayer = L.layerGroup();
+  let stations    = null; // {code, name, lat, lng}[]
+  let panelOpen   = false;
+  let loading     = false;
+
+  // ── 色スケール ────────────────────────────────
+  function color(mm) {
+    if (mm == null || isNaN(mm)) return { f: 'rgba(200,200,200,0.25)', s: '#bbb' };
+    if (mm <   1)  return { f: 'rgba(220,245,255,0.45)', s: '#aac' };
+    if (mm <  10)  return { f: 'rgba(100,185,255,0.55)', s: '#59b' };
+    if (mm <  30)  return { f: 'rgba(0,120,220,0.62)',   s: '#048' };
+    if (mm <  60)  return { f: 'rgba(0,55,190,0.68)',    s: '#024' };
+    if (mm < 120)  return { f: 'rgba(100,0,180,0.72)',   s: '#408' };
+    if (mm < 200)  return { f: 'rgba(180,0,0,0.75)',     s: '#900' };
+    return              { f: 'rgba(220,60,0,0.82)',      s: '#b20' };
   }
 
-  // ── 指定日のメッシュを描画 ────────────────────
-  function renderDate(date) {
-    precipGroup.clearLayers();
-    const rows = allRows.filter(r => r.date === date);
-    if (!rows.length) return;
+  // ── AMeDAS 観測点取得 ─────────────────────────
+  async function loadStations() {
+    if (stations) return stations;
+    const r = await fetch('https://www.jma.go.jp/bosai/amedas/const/amedastable.json');
+    const tbl = await r.json();
+    stations = [];
+    for (const [code, info] of Object.entries(tbl)) {
+      if (!info.rain) continue;
+      const lat = info.lat[0] + info.lat[1] / 60;
+      const lng = info.lon[0] + info.lon[1] / 60;
+      if (lat >= AREA.latMin && lat <= AREA.latMax &&
+          lng >= AREA.lngMin && lng <= AREA.lngMax) {
+        stations.push({ code, name: info.kjName || code,
+                        lat: +lat.toFixed(4), lng: +lng.toFixed(4) });
+      }
+    }
+    return stations;
+  }
 
-    const STEP = 0.01; // 格子間隔(°)
-    rows.forEach(r => {
-      const mm = r.value;
-      const { fill, stroke } = mmColor(mm);
-      const bounds = [
-        [r.lat - STEP / 2, r.lng - STEP / 2],
-        [r.lat + STEP / 2, r.lng + STEP / 2]
-      ];
-      L.rectangle(bounds, {
-        color: stroke, weight: 0.5,
-        fillColor: fill, fillOpacity: 0.7
-      })
-        .bindTooltip(`<b>${mm != null ? mm.toFixed(1) : '--'} mm</b><br>${date}`, { sticky: true })
-        .addTo(precipGroup);
+  // ── 1日分の降水量（mm）を取得 ─────────────────
+  async function fetchDayRain(code, dateStr) {
+    // 1時間ファイルを並列取得して precipitation1h を合計
+    const [y, m, d] = dateStr.split('-');
+    const ymd = `${y}${m}${d}`;
+    const reqs = [];
+    for (let hh = 1; hh <= 24; hh++) {
+      const h = String(hh).padStart(2, '0');
+      reqs.push(
+        fetch(`https://www.jma.go.jp/bosai/amedas/data/point/${code}/${ymd}_${h}0000.json`, { cache: 'no-store' })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      );
+    }
+    const results = await Promise.all(reqs);
+    let total = 0, found = false;
+    for (const data of results) {
+      if (!data) continue;
+      // 各10分データの precipitation1h（その時刻の正時からの積算値）
+      // 最後のキーの値を使用
+      const entries = Object.values(data);
+      for (const entry of entries) {
+        const v = entry?.precipitation1h;
+        if (Array.isArray(v) && v[0] != null) {
+          total += parseFloat(v[0]);
+          found = true;
+          break; // 1時間ファイルごとに1値
+        }
+      }
+    }
+    return found ? +total.toFixed(1) : null;
+  }
+
+  // ── IDW補間 ───────────────────────────────────
+  function idw(gridPt, stationsWithVal) {
+    const LAT_KM = 111.0;
+    const LNG_KM = 111.0 * Math.cos(gridPt.lat * Math.PI / 180);
+    let wSum = 0, vSum = 0;
+    for (const s of stationsWithVal) {
+      const dlat = (s.lat - gridPt.lat) * LAT_KM;
+      const dlng = (s.lng - gridPt.lng) * LNG_KM;
+      const dist = Math.sqrt(dlat * dlat + dlng * dlng);
+      if (dist < 0.01) return s.value;
+      const w = 1 / Math.pow(dist, IDW_P);
+      wSum += w; vSum += w * s.value;
+    }
+    return wSum > 0 ? +(vSum / wSum).toFixed(1) : null;
+  }
+
+  // ── メッシュ描画 ──────────────────────────────
+  function drawMesh(stationsWithVal, label) {
+    precipLayer.clearLayers();
+    GRID.forEach(pt => {
+      const mm = idw(pt, stationsWithVal);
+      const { f, s } = color(mm);
+      L.rectangle(
+        [[pt.lat - CELL / 2, pt.lng - CELL / 2],
+         [pt.lat + CELL / 2, pt.lng + CELL / 2]],
+        { color: s, weight: 0.4, fillColor: f, fillOpacity: 0.72 }
+      ).bindTooltip(
+        `<b>${mm != null ? mm.toFixed(1) : '--'} mm</b><br><small>${label}</small>`,
+        { sticky: true }
+      ).addTo(precipLayer);
     });
-
-    precipGroup.addTo(map);
-    setStatus(`${date} の降水量メッシュを表示中`);
-    loadedDate = date;
+    precipLayer.addTo(map);
   }
 
-  // ── CSV パース ────────────────────────────
-  function parseCSV(text) {
-    const lines = text.trim().split(/\r?\n/);
-    if (lines.length < 2) return [];
-    const header = lines[0].split(',').map(h => h.trim().replace(/^﻿/, ''));
-    const idxDate = header.findIndex(h => h === '日付');
-    const idxLat  = header.findIndex(h => h === '緯度');
-    const idxLng  = header.findIndex(h => h === '経度');
-    const idxVal  = header.findIndex(h => h.includes('降水量'));
-
-    if (idxDate < 0 || idxLat < 0 || idxLng < 0 || idxVal < 0) {
-      alert('CSVのヘッダーが正しくありません。\n必要な列: 日付, 緯度, 経度, 日降水量(mm)');
-      return [];
+  // ── 日付リスト生成（start〜end） ───────────────
+  function dateBetween(s, e) {
+    const dates = [];
+    const cur = new Date(s + 'T00:00:00+09:00');
+    const end = new Date(e + 'T00:00:00+09:00');
+    while (cur <= end) {
+      dates.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
     }
+    return dates;
+  }
 
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
-      if (cols.length <= Math.max(idxDate, idxLat, idxLng, idxVal)) continue;
-      const val = parseFloat(cols[idxVal]);
-      rows.push({
-        date:  cols[idxDate].trim(),
-        lat:   parseFloat(cols[idxLat]),
-        lng:   parseFloat(cols[idxLng]),
-        value: isNaN(val) ? null : val
-      });
+  // ── メイン処理 ────────────────────────────────
+  async function run(startDate, endDate) {
+    if (loading) return;
+    loading = true;
+    setStatus('観測点を取得中...', true);
+
+    try {
+      const sts = await loadStations();
+      const dates = dateBetween(startDate, endDate);
+
+      setStatus(`データ取得中 (0/${dates.length}日)...`, true);
+
+      // 日付ごとに集計、最終的に合計
+      const totals = {}; // code → total mm
+      sts.forEach(s => { totals[s.code] = 0; });
+
+      for (let di = 0; di < dates.length; di++) {
+        const date = dates[di];
+        setStatus(`データ取得中 (${di + 1}/${dates.length}日: ${date})...`, true);
+
+        await Promise.all(sts.map(async s => {
+          const v = await fetchDayRain(s.code, date);
+          if (v != null) totals[s.code] += v;
+        }));
+      }
+
+      const stWithVal = sts
+        .filter(s => totals[s.code] > 0 || Object.values(totals).some(v => v > 0))
+        .map(s => ({ ...s, value: totals[s.code] }));
+
+      if (!stWithVal.length) {
+        setStatus('データが取得できませんでした（期間が古すぎる可能性があります）');
+        loading = false;
+        return;
+      }
+
+      const label = startDate === endDate
+        ? startDate
+        : `${startDate} 〜 ${endDate} 合計`;
+
+      drawMesh(stWithVal, label);
+      setStatus(`表示中: ${label}`);
+    } catch (e) {
+      console.error(e);
+      setStatus('エラーが発生しました');
     }
-    return rows;
+    loading = false;
   }
 
-  // ── CSV 読み込み ──────────────────────────
-  function loadCSV(file) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      allRows  = parseCSV(e.target.result);
-      dateList = [...new Set(allRows.map(r => r.date))].sort();
-      if (!dateList.length) { setStatus('データなし'); return; }
-
-      const sel = document.getElementById('precDateSel');
-      sel.innerHTML = '';
-      dateList.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = opt.textContent = d;
-        sel.appendChild(opt);
-      });
-      sel.value = dateList[dateList.length - 1];
-      renderDate(sel.value);
-      document.getElementById('precExportBtn').disabled = false;
-      setStatus(`${file.name} を読み込みました（${dateList.length} 日分）`);
-    };
-    reader.readAsText(file, 'utf-8');
-  }
-
-  // ── CSV エクスポート ──────────────────────
-  function exportCSV() {
-    if (!allRows.length) return;
-    const header = '日付,緯度,経度,日降水量(mm)';
-    const body = allRows.map(r =>
-      `${r.date},${r.lat},${r.lng},${r.value != null ? r.value : ''}`
-    ).join('\r\n');
-    const blob = new Blob(['﻿' + header + '\r\n' + body], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `rain_mesh_export.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── ステータス表示 ────────────────────────
-  function setStatus(msg) {
+  // ── UI ───────────────────────────────────────
+  function setStatus(msg, spin = false) {
     const el = document.getElementById('precStatus');
-    if (el) el.textContent = msg;
+    if (el) el.textContent = (spin ? '⏳ ' : '') + msg;
   }
 
-  // ── パネル構築 ───────────────────────────
+  function maxDate() {
+    return new Date().toISOString().slice(0, 10);
+  }
+  function minDate() {
+    const d = new Date();
+    d.setDate(d.getDate() - 10);
+    return d.toISOString().slice(0, 10);
+  }
+  function defaultStart() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
   function buildPanel() {
     const panel = document.createElement('div');
     panel.id = 'precPanel';
     panel.style.display = 'none';
     panel.innerHTML = `
-      <div id="precHeader">
-        <span>☔ 降水量メッシュ</span>
-        <button id="precClose">✕</button>
+      <div id="precTitle">🔬 解析ツール</div>
+      <div class="prec-tool-row">
+        <label class="prec-chk-label">
+          <input type="checkbox" id="precChk"> ☔ 降水量メッシュ
+        </label>
       </div>
-      <div id="precBody">
-        <div class="prec-drop-zone" id="precDropZone">
-          <div>CSVをここにドロップ</div>
-          <div class="prec-drop-sub">またはクリックして選択</div>
-          <input type="file" id="precFileInput" accept=".csv" style="display:none">
+      <div id="precOptions" style="display:none">
+        <div class="prec-date-row">
+          <label>開始</label>
+          <input type="date" id="precStart" min="${minDate()}" max="${maxDate()}" value="${defaultStart()}">
         </div>
-        <div class="prec-row" id="precDateRow" style="display:none">
-          <label>日付</label>
-          <select id="precDateSel"></select>
+        <div class="prec-date-row">
+          <label>終了</label>
+          <input type="date" id="precEnd"   min="${minDate()}" max="${maxDate()}" value="${defaultStart()}">
         </div>
-        <div class="prec-btn-row">
-          <button id="precExportBtn" disabled>CSV出力</button>
-          <button id="precClearBtn">クリア</button>
-        </div>
-        <div id="precStatus">Pythonスクリプトで生成したCSVをドロップしてください</div>
+        <div class="prec-note-small">※ AMeDAS 直近10日のみ対応</div>
+        <button id="precRunBtn">表示</button>
+        <div id="precStatus">日付を選んで「表示」を押してください</div>
         <div id="precLegend">
-          <div class="prec-leg-title">日降水量</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(100,180,255,0.85)"></span>&lt; 10 mm</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(0,120,220,0.85)"></span>10 – 30</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(0,50,180,0.85)"></span>30 – 60</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(100,0,180,0.85)"></span>60 – 120</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(180,0,0,0.85)"></span>120 – 200</div>
-          <div class="prec-leg-row"><span class="prec-sw" style="background:rgba(220,50,0,0.85)"></span>200 mm 以上</div>
+          <div class="plg-title">降水量（期間合計）</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(100,185,255,0.9)"></span>&lt; 10 mm</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(0,120,220,0.9)"></span>10 – 30</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(0,55,190,0.9)"></span>30 – 60</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(100,0,180,0.9)"></span>60 – 120</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(180,0,0,0.9)"></span>120 – 200</div>
+          <div class="plg-row"><span class="plg-sw" style="background:rgba(220,60,0,0.9)"></span>200 mm 以上</div>
         </div>
-        <div class="prec-note">fetch_rain_mesh.py で生成したCSVを読み込みます</div>
       </div>
     `;
     document.body.appendChild(panel);
 
-    // ボタンイベント
-    document.getElementById('precClose').addEventListener('click', () => {
-      panel.style.display = 'none';
-      precipGroup.remove();
-    });
-    document.getElementById('precExportBtn').addEventListener('click', exportCSV);
-    document.getElementById('precClearBtn').addEventListener('click', () => {
-      allRows = []; dateList = [];
-      precipGroup.clearLayers(); precipGroup.remove();
-      document.getElementById('precDateRow').style.display = 'none';
-      document.getElementById('precExportBtn').disabled = true;
-      setStatus('Pythonスクリプトで生成したCSVをドロップしてください');
-    });
-
-    // 日付選択
-    document.getElementById('precDateSel').addEventListener('change', e => {
-      renderDate(e.target.value);
-    });
-
-    // ドロップゾーン
-    const zone = document.getElementById('precDropZone');
-    const fileInput = document.getElementById('precFileInput');
-
-    zone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', e => {
-      if (e.target.files[0]) {
-        loadCSV(e.target.files[0]);
-        document.getElementById('precDateRow').style.display = 'flex';
+    // チェックボックス
+    document.getElementById('precChk').addEventListener('change', e => {
+      const opts = document.getElementById('precOptions');
+      opts.style.display = e.target.checked ? 'block' : 'none';
+      if (!e.target.checked) {
+        precipLayer.clearLayers();
+        precipLayer.remove();
+        setStatus('日付を選んで「表示」を押してください', false);
       }
     });
-    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-    zone.addEventListener('drop', e => {
-      e.preventDefault();
-      zone.classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.endsWith('.csv')) {
-        loadCSV(file);
-        document.getElementById('precDateRow').style.display = 'flex';
-      } else {
-        alert('CSVファイルをドロップしてください');
-      }
+
+    // 日付バリデーション
+    function validateDates() {
+      const s = document.getElementById('precStart').value;
+      const e = document.getElementById('precEnd').value;
+      if (!s || !e) return false;
+      const days = (new Date(e) - new Date(s)) / 86400000 + 1;
+      if (days < 1) { alert('終了日は開始日以降にしてください'); return false; }
+      if (days > MAX_DAYS) { alert(`最大${MAX_DAYS}日間まで指定できます`); return false; }
+      return true;
+    }
+
+    document.getElementById('precRunBtn').addEventListener('click', () => {
+      if (!validateDates()) return;
+      const s = document.getElementById('precStart').value;
+      const e = document.getElementById('precEnd').value;
+      run(s, e);
     });
   }
 
-  // ── 地図ボタン ───────────────────────────
+  // 地図ボタン（☔アイコン）
   function addMapButton() {
     const ctrl = L.control({ position: 'topleft' });
     ctrl.onAdd = function () {
       const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-      div.innerHTML = '<button id="precToggle" title="降水量メッシュ" style="width:30px;height:30px;font-size:16px;cursor:pointer;background:#fff;border:none;line-height:30px;">☔</button>';
+      div.innerHTML = '<button id="precToggle" title="解析ツール" style="width:30px;height:30px;font-size:15px;cursor:pointer;background:#fff;border:none;line-height:30px;">🔬</button>';
       L.DomEvent.disableClickPropagation(div);
       div.querySelector('#precToggle').addEventListener('click', () => {
-        const panel = document.getElementById('precPanel');
-        if (!panel) return;
-        const visible = panel.style.display !== 'none';
-        panel.style.display = visible ? 'none' : 'block';
-        if (visible) precipGroup.remove();
-        else if (loadedDate) precipGroup.addTo(map);
+        const p = document.getElementById('precPanel');
+        if (!p) return;
+        panelOpen = !panelOpen;
+        p.style.display = panelOpen ? 'block' : 'none';
+        if (!panelOpen) {
+          precipLayer.clearLayers(); precipLayer.remove();
+          const chk = document.getElementById('precChk');
+          if (chk) chk.checked = false;
+          document.getElementById('precOptions').style.display = 'none';
+        }
       });
       return div;
     };
