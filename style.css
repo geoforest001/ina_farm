@@ -694,8 +694,25 @@ body {
 .lc-open-btn:hover { background: #f4f4f4; }
 @media (max-width: 767px) {
   .leaflet-control-layers {
-    max-height: 80vh;
+    max-height: 60vh;
     overflow-y: auto;
+    font-size: 11px !important;
+  }
+  .leaflet-control-layers-expanded {
+    padding: 4px 8px !important;
+  }
+  .leaflet-control-layers label {
+    padding: 1px 0 !important;
+    margin: 0 !important;
+  }
+  .leaflet-control-layers input[type="checkbox"],
+  .leaflet-control-layers input[type="radio"] {
+    width: 12px;
+    height: 12px;
+    margin-right: 4px;
+  }
+  .leaflet-control-layers-separator {
+    margin: 3px 0 !important;
   }
 }
 
