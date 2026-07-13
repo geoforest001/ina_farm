@@ -220,7 +220,7 @@ function renderLayerControl() {
   document.getElementById('map').appendChild(openBtn);
 
   function openPanel()  { panel.classList.remove('lc-hidden'); openBtn.style.display = 'none'; }
-  function closePanel() { panel.classList.add('lc-hidden');    openBtn.style.display = ''; }
+  function closePanel() { panel.classList.add('lc-hidden');    openBtn.style.display = 'block'; }
 
   closeBtn.addEventListener('click', closePanel);
   openBtn.addEventListener('click', openPanel);
