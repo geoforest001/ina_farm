@@ -194,30 +194,29 @@ let layerControl;
 function renderLayerControl() {
   if (layerControl) map.removeControl(layerControl);
 
-  var isMobile = window.innerWidth < 768;
   layerControl = L.control.layers(baseLayers, overlays, {
     position: "topright",
     collapsed: false
   });
   layerControl.addTo(map);
 
-  // レイヤパネル開閉ボタン
+  // デスクトップはそのまま（ボタン追加しない）
+  if (window.innerWidth >= 768) return;
+
   var panel = document.querySelector('.leaflet-control-layers');
   if (!panel) return;
 
-  // 閉じるボタン
+  // ✕ 閉じるボタン（パネル内）
   var closeBtn = document.createElement('button');
   closeBtn.className = 'lc-close-btn';
   closeBtn.textContent = '✕';
-  closeBtn.title = 'レイヤパネルを閉じる';
   panel.insertBefore(closeBtn, panel.firstChild);
 
-  // 開くボタン（地図上に固定）
+  // 「レイヤ」開くボタン（body直下・fixed配置）
   var openBtn = document.createElement('button');
   openBtn.className = 'lc-open-btn';
-  openBtn.textContent = 'レイヤ ▾';
-  openBtn.title = 'レイヤパネルを開く';
-  document.getElementById('map').appendChild(openBtn);
+  openBtn.textContent = 'レイヤ';
+  document.body.appendChild(openBtn);
 
   function openPanel()  { panel.classList.remove('lc-hidden'); openBtn.style.display = 'none'; }
   function closePanel() { panel.classList.add('lc-hidden');    openBtn.style.display = 'block'; }
@@ -225,8 +224,7 @@ function renderLayerControl() {
   closeBtn.addEventListener('click', closePanel);
   openBtn.addEventListener('click', openPanel);
 
-  // モバイルは最初から閉じた状態
-  if (isMobile) closePanel();
+  closePanel(); // モバイルは起動時に閉じた状態
 }
 
 renderLayerControl();
