@@ -124,9 +124,8 @@ const waterwayTiles = protomapsL.leafletLayer({
   ],
   labelRules: []
 });
-// 描画順：開水路 → パイプライン（ポイント系レイヤを上に）
-waterwayTiles.addTo(map);
 pipelineTiles.addTo(map);
+waterwayTiles.addTo(map);
 
 const SURVEY_URL = "https://geoforest001.github.io/ina_farm/data/manhole.pmtiles";
 
