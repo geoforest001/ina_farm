@@ -108,8 +108,6 @@ const pipelineTiles = protomapsL.leafletLayer({
   ],
   labelRules: []
 });
-pipelineTiles.addTo(map);
-
 const WATERWAY_URL = "https://geoforest001.github.io/ina_farm/data/suiro.pmtiles";
 
 const waterwayTiles = protomapsL.leafletLayer({
@@ -126,7 +124,9 @@ const waterwayTiles = protomapsL.leafletLayer({
   ],
   labelRules: []
 });
+// 描画順：開水路 → パイプライン（ポイント系レイヤを上に）
 waterwayTiles.addTo(map);
+pipelineTiles.addTo(map);
 
 const SURVEY_URL = "https://geoforest001.github.io/ina_farm/data/manhole.pmtiles";
 
