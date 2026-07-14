@@ -238,6 +238,34 @@ const shisetsuTiles = protomapsL.leafletLayer({
 });
 shisetsuTiles.addTo(map);
 
+/* マンホールクリックポップアップ */
+let manholePinData = null;
+fetch('data/manhole_pins.json')
+  .then(r => r.json())
+  .then(data => { manholePinData = data; });
+
+map.on('click', function(e) {
+  if (!manholePinData || !map.hasLayer(surveyTiles)) return;
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  let nearest = null, minDist = Infinity;
+  for (const d of manholePinData) {
+    const dl = d.y - lat, dn = (d.x - lng) * cosLat;
+    const dist = dl * dl + dn * dn;
+    if (dist < minDist) { minDist = dist; nearest = d; }
+  }
+  // 約50m以内のみ表示
+  if (!nearest || minDist > 0.00045 * 0.00045) return;
+  const rows = [
+    nearest.h ? `<tr><th>配管名</th><td>${nearest.h}</td></tr>` : '',
+    nearest.k ? `<tr><th>種別</th><td>${nearest.k}</td></tr>` : ''
+  ].filter(Boolean).join('');
+  L.popup({ maxWidth: 200 })
+    .setLatLng([nearest.y, nearest.x])
+    .setContent(`<table class="shisetsu-popup">${rows}</table>`)
+    .openOn(map);
+});
+
 /* 点施設クリックポップアップ */
 let shisetsuPinData = null;
 fetch('data/shisetsu_pins.json')
