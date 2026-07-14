@@ -229,7 +229,7 @@ const shisetsuTiles = protomapsL.leafletLayer({
         fill: '#e00',
         stroke: '#e00',
         outerRadius: 7,
-        innerRadius: 4,
+        innerRadius: 5.5,
         strokeWidth: 1.5
       })
     }
