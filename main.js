@@ -180,13 +180,72 @@ const surveyTiles = protomapsL.leafletLayer({
 });
 surveyTiles.addTo(map);
 
+const SHISETSU_URL = "https://geoforest001.github.io/ina_farm/data/shisetsu.pmtiles";
+
+class DoubleCircleSymbolizer {
+  constructor({ fill, stroke, outerRadius, innerRadius, strokeWidth }) {
+    this.fill = fill;
+    this.stroke = stroke;
+    this.outerRadius = outerRadius;
+    this.innerRadius = innerRadius;
+    this.strokeWidth = strokeWidth;
+  }
+  draw(ctx, geom, z, feature) {
+    for (const ring of geom) {
+      for (const pt of ring) {
+        // 外側の円
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, this.outerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+        // 内側の円（白抜き）
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, this.innerRadius, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = this.stroke;
+        ctx.lineWidth = this.strokeWidth;
+        ctx.stroke();
+        // 中心点
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, this.strokeWidth, 0, Math.PI * 2);
+        ctx.fillStyle = this.fill;
+        ctx.fill();
+      }
+    }
+  }
+}
+
+const shisetsuTiles = protomapsL.leafletLayer({
+  url: SHISETSU_URL,
+  maxDataZoom: 16,
+  paintRules: [
+    {
+      dataLayer: "shisetsu",
+      symbolizer: new DoubleCircleSymbolizer({
+        fill: '#e00',
+        stroke: '#e00',
+        outerRadius: 7,
+        innerRadius: 4,
+        strokeWidth: 1.5
+      })
+    }
+  ],
+  labelRules: []
+});
+shisetsuTiles.addTo(map);
+
 const baseLayers = {};
 
 const overlays = {
   "農地筆ポリゴン": farmPolygonTiles,
   "パイプライン": pipelineTiles,
   "水路": waterwayTiles,
-  "マンホール": surveyTiles
+  "マンホール": surveyTiles,
+  "点施設": shisetsuTiles
 };
 
 let layerControl;
