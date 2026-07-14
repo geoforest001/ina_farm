@@ -129,6 +129,10 @@ waterwayTiles.addTo(map);
 
 const SURVEY_URL = "https://geoforest001.github.io/ina_farm/data/manhole.pmtiles";
 
+// ポイント系レイヤを線レイヤの上に表示するカスタムペイン
+map.createPane('pointPane');
+map.getPane('pointPane').style.zIndex = 450;
+
 class SquareSymbolizer {
   constructor({ fill, stroke = "black", width = 1, size = 4 }) {
     this.fill = fill;
@@ -155,6 +159,7 @@ class SquareSymbolizer {
 const surveyTiles = protomapsL.leafletLayer({
   url: SURVEY_URL,
   maxDataZoom: 15,
+  pane: 'pointPane',
   paintRules: [
     {
       dataLayer: "02調査結果 R6",
@@ -221,6 +226,7 @@ class DoubleCircleSymbolizer {
 const shisetsuTiles = protomapsL.leafletLayer({
   url: SHISETSU_URL,
   maxDataZoom: 16,
+  pane: 'pointPane',
   paintRules: [
     {
       dataLayer: "shisetsu",
