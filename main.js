@@ -301,10 +301,10 @@ const baseLayers = {};
 
 const overlays = {
   "農地筆ポリゴン": farmPolygonTiles,
+  "農業施設": shisetsuTiles,
+  "開水路": waterwayTiles,
   "パイプライン": pipelineTiles,
-  "水路": waterwayTiles,
-  "マンホール": surveyTiles,
-  "点施設": shisetsuTiles
+  "マンホール": surveyTiles
 };
 
 let layerControl;
