@@ -238,6 +238,37 @@ const shisetsuTiles = protomapsL.leafletLayer({
 });
 shisetsuTiles.addTo(map);
 
+/* 点施設クリックポップアップ */
+let shisetsuPinData = null;
+fetch('data/shisetsu_pins.json')
+  .then(r => r.json())
+  .then(data => { shisetsuPinData = data; });
+
+map.on('click', function(e) {
+  if (!shisetsuPinData || !map.hasLayer(shisetsuTiles)) return;
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+  const cosLat = Math.cos(lat * Math.PI / 180);
+  let nearest = null, minDist = Infinity;
+  for (const d of shisetsuPinData) {
+    const dl = d.y - lat, dn = (d.x - lng) * cosLat;
+    const dist = dl * dl + dn * dn;
+    if (dist < minDist) { minDist = dist; nearest = d; }
+  }
+  // 約80m以内のみ表示
+  if (!nearest || minDist > 0.0007 * 0.0007) return;
+  const rows = [
+    nearest.n ? `<tr><th>施設名</th><td>${nearest.n}</td></tr>` : '',
+    nearest.k ? `<tr><th>施設区分</th><td>${nearest.k}</td></tr>` : '',
+    nearest.m ? `<tr><th>管理団体名</th><td>${nearest.m}</td></tr>` : '',
+    nearest.u ? `<tr><th>用排区分</th><td>${nearest.u}</td></tr>` : '',
+    nearest.b && nearest.b.trim() ? `<tr><th>区間部位</th><td>${nearest.b}</td></tr>` : ''
+  ].filter(Boolean).join('');
+  L.popup({ maxWidth: 240 })
+    .setLatLng([nearest.y, nearest.x])
+    .setContent(`<table class="shisetsu-popup">${rows}</table>`)
+    .openOn(map);
+});
+
 const baseLayers = {};
 
 const overlays = {
