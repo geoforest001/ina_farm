@@ -659,6 +659,14 @@ body {
 #precSection .prec-date-row input[type=date] { width: 100%; min-width: 0; }
 #precSection #precRunBtn    { margin-top: 2px; }
 
+/* 点施設ポップアップ */
+.shisetsu-popup { border-collapse: collapse; font-size: 12px; width: 100%; }
+.shisetsu-popup th {
+  text-align: left; white-space: nowrap;
+  padding: 2px 6px 2px 0; color: #666; font-weight: normal;
+}
+.shisetsu-popup td { padding: 2px 0; font-weight: bold; }
+
 /* レイヤパネル開閉 */
 .leaflet-control-layers.lc-hidden {
   display: none !important;
