@@ -128,7 +128,7 @@ const waterwayTiles = protomapsL.leafletLayer({
 });
 waterwayTiles.addTo(map);
 
-const SURVEY_URL = "https://geoforest001.github.io/ina_farm_test/data/%E3%83%9E%E3%83%B3%E3%83%9B%E3%83%BC%E3%83%AB.pmtiles";
+const SURVEY_URL = "https://geoforest001.github.io/ina_farm/data/manhole.pmtiles";
 
 class SquareSymbolizer {
   constructor({ fill, stroke = "black", width = 1, size = 4 }) {
