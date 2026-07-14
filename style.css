@@ -667,6 +667,14 @@ body {
 }
 .shisetsu-popup td { padding: 2px 0; font-weight: bold; }
 
+/* レイヤコントロール スクロール（PC） */
+@media (min-width: 768px) {
+  .leaflet-control-layers-expanded {
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+  }
+}
+
 /* レイヤパネル開閉 */
 .leaflet-control-layers.lc-hidden {
   display: none !important;
