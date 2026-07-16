@@ -352,6 +352,15 @@ function renderLayerControl() {
 
 renderLayerControl();
 
+/* ─── ブランディング表示 ─────────────────────────── */
+const brandingControl = L.control({ position: 'bottomright' });
+brandingControl.onAdd = function() {
+  const div = L.DomUtil.create('div', 'gf-branding');
+  div.innerHTML = 'Powered by Geo･Forest Co.,Ltd.';
+  return div;
+};
+brandingControl.addTo(map);
+
 /* ─── 現在地ボタン ─────────────────────────────── */
   let currentLocationMarker = null;
 
