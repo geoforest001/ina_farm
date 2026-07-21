@@ -323,9 +323,6 @@ function renderLayerControl() {
   });
   layerControl.addTo(map);
 
-  // デスクトップはそのまま（ボタン追加しない）
-  if (window.innerWidth >= 768) return;
-
   var panel = document.querySelector('.leaflet-control-layers');
   if (!panel) return;
 
@@ -335,10 +332,10 @@ function renderLayerControl() {
   closeBtn.textContent = '✕';
   panel.insertBefore(closeBtn, panel.firstChild);
 
-  // 「レイヤ」開くボタン（body直下・fixed配置）
+  // 「メニュー」開くボタン（body直下・fixed配置）
   var openBtn = document.createElement('button');
   openBtn.className = 'lc-open-btn';
-  openBtn.textContent = 'レイヤ';
+  openBtn.textContent = 'メニュー';
   document.body.appendChild(openBtn);
 
   function openPanel()  { panel.classList.remove('lc-hidden'); openBtn.style.display = 'none'; }
@@ -347,7 +344,7 @@ function renderLayerControl() {
   closeBtn.addEventListener('click', closePanel);
   openBtn.addEventListener('click', openPanel);
 
-  closePanel(); // モバイルは起動時に閉じた状態
+  if (window.innerWidth < 768) closePanel(); // モバイルは起動時に閉じた状態
 }
 
 renderLayerControl();
