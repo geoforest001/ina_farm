@@ -854,6 +854,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="leaflet-control-layers-separator" style="margin:6px 0 0"></div>`;
       lcList.insertBefore(farmWrap, lcList.firstChild);
 
+      const tbDiv2 = document.createElement('div');
+      tbDiv2.id = 'tbLayers';
+      tbDiv2.innerHTML = `<button class="tb-btn" id="btnCurrentLoc"><span class="ico">📍</span><span>現在地</span></button>`;
+      lcList.insertBefore(tbDiv2, farmWrap);
+
       const farmInput = document.getElementById('farmInput');
       const farmBtn   = document.getElementById('farmBtn');
       const farmList  = document.getElementById('farmResults');
@@ -956,20 +961,11 @@ document.addEventListener('DOMContentLoaded', () => {
     bmSep.className = 'leaflet-control-layers-separator';
     base.appendChild(bmSep);
 
-    /* 現在地ボタン（最上部） */
-    const tbDiv = document.createElement('div');
-    tbDiv.id = 'tbLayers';
-    tbDiv.innerHTML = `<button class="tb-btn" id="btnCurrentLoc"><span class="ico">📍</span><span>現在地</span></button>`;
-    overlays.insertBefore(tbDiv, overlays.firstChild);
-    const tbSep = document.createElement('div');
-    tbSep.className = 'leaflet-control-layers-separator';
-    overlays.insertBefore(tbSep, tbDiv.nextSibling);
-
     /* 農地レイヤ 見出し */
     const farmLbl = document.createElement('div');
     farmLbl.className = 'lc-section-label';
     farmLbl.textContent = '農地レイヤ';
-    overlays.insertBefore(farmLbl, tbSep.nextSibling);
+    overlays.insertBefore(farmLbl, overlays.firstChild);
 
     /* 気象レイヤ セクション */
     const sep1 = document.createElement('div');
