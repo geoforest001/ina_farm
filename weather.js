@@ -956,11 +956,20 @@ document.addEventListener('DOMContentLoaded', () => {
     bmSep.className = 'leaflet-control-layers-separator';
     base.appendChild(bmSep);
 
+    /* 現在地ボタン（最上部） */
+    const tbDiv = document.createElement('div');
+    tbDiv.id = 'tbLayers';
+    tbDiv.innerHTML = `<button class="tb-btn" id="btnCurrentLoc"><span class="ico">📍</span><span>現在地</span></button>`;
+    overlays.insertBefore(tbDiv, overlays.firstChild);
+    const tbSep = document.createElement('div');
+    tbSep.className = 'leaflet-control-layers-separator';
+    overlays.insertBefore(tbSep, tbDiv.nextSibling);
+
     /* 農地レイヤ 見出し */
     const farmLbl = document.createElement('div');
     farmLbl.className = 'lc-section-label';
     farmLbl.textContent = '農地レイヤ';
-    overlays.insertBefore(farmLbl, overlays.firstChild);
+    overlays.insertBefore(farmLbl, tbSep.nextSibling);
 
     /* 気象レイヤ セクション */
     const sep1 = document.createElement('div');
@@ -1012,21 +1021,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const lbl = document.createElement('label');
     lbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>ダッシュボードを開く</span>';
     overlays.appendChild(lbl);
-
-    /* ツールボックス セクション */
-    const sep3 = document.createElement('div');
-    sep3.className = 'leaflet-control-layers-separator';
-    overlays.appendChild(sep3);
-    const tbLbl = document.createElement('div');
-    tbLbl.className = 'lc-section-label';
-    tbLbl.textContent = '活動用ツールボックス';
-    overlays.appendChild(tbLbl);
-    const tbDiv = document.createElement('div');
-    tbDiv.id = 'tbLayers';
-    tbDiv.innerHTML = `
-      <button class="tb-btn" id="btnCurrentLoc"><span class="ico">📍</span><span>現在地</span></button>
-    `;
-    overlays.appendChild(tbDiv);
 
     /* イベントリスナー */
     document.getElementById('chkWeather').addEventListener('change', function() {
