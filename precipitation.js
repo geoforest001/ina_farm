@@ -246,6 +246,21 @@
     `;
     overlays.appendChild(section);
 
+    /* 気象情報ダッシュボード（解析ツールボックスの下） */
+    const dashSep = document.createElement('div');
+    dashSep.className = 'leaflet-control-layers-separator';
+    overlays.appendChild(dashSep);
+    const dashLbl = document.createElement('div');
+    dashLbl.className = 'lc-section-label';
+    dashLbl.textContent = '気象情報ダッシュボード';
+    overlays.appendChild(dashLbl);
+    const dashChkLbl = document.createElement('label');
+    dashChkLbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>ダッシュボードを開く</span>';
+    overlays.appendChild(dashChkLbl);
+    document.getElementById('chkWeather').addEventListener('change', function() {
+      if (this.checked) openWxPanel(); else closeWxPanel();
+    });
+
     document.getElementById('precChk').addEventListener('change', e => {
       document.getElementById('precOptions').style.display = e.target.checked ? 'block' : 'none';
       if (!e.target.checked) {

@@ -1006,22 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
       map.getContainer().appendChild(bar);
     }
 
-    /* 気象情報ダッシュボード チェックボックス */
-    const sep2 = document.createElement('div');
-    sep2.className = 'leaflet-control-layers-separator';
-    overlays.appendChild(sep2);
-    const dashLbl = document.createElement('div');
-    dashLbl.className = 'lc-section-label';
-    dashLbl.textContent = '気象情報ダッシュボード';
-    overlays.appendChild(dashLbl);
-    const lbl = document.createElement('label');
-    lbl.innerHTML = '<input type="checkbox" class="leaflet-control-layers-selector" id="chkWeather"> <span>ダッシュボードを開く</span>';
-    overlays.appendChild(lbl);
-
     /* イベントリスナー */
-    document.getElementById('chkWeather').addEventListener('change', function() {
-      if (this.checked) openWxPanel(); else closeWxPanel();
-    });
     /* レーダー雨量 */
     document.getElementById('chkLRain').addEventListener('change', function() {
       wxLayerState['rain'].on = this.checked;
