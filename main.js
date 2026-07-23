@@ -85,29 +85,34 @@ fetch('data/farm_pins.json')
     farmPinLayer = L.geoJSON(null, { pointToLayer: () => L.circleMarker([0,0], {radius:0, opacity:0, fillOpacity:0}) });
     farmPinLayer.addTo(map);
   });
-/* 農地筆ポリゴン クリック: ハイライト＋地番ポップアップ */
+/* 農地筆ポリゴン クリック: queryFeaturesで正確なPIP→ハイライト＋地番ポップアップ */
 map.on('click', function(e) {
-  if (!farmPinData || map.getZoom() < 15) return;
   if (!map.hasLayer(farmPolygonTiles)) return;
-  const lat = e.latlng.lat;
-  const lng = e.latlng.lng;
-  const cosLat = Math.cos(lat * Math.PI / 180);
-  let nearest = null, minDist = Infinity;
-  for (const d of farmPinData) {
-    const dlat = d.y - lat;
-    const dlng = (d.x - lng) * cosLat;
-    const dist = dlat * dlat + dlng * dlng;
-    if (dist < minDist) { minDist = dist; nearest = d; }
-  }
-  if (nearest && minDist < 0.00045 * 0.00045) {
+  if (map.getZoom() < 15) return;
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+
+  // protomaps queryFeatures でクリック点を含むポリゴンを取得（点内包テスト）
+  var hits = farmPolygonTiles.queryFeatures(lng, lat, map.getZoom(), 0);
+  var farmHit = null;
+  for (var h of hits) { if (h.layerName === '農地筆ポリゴン') { farmHit = h; break; } }
+
+  if (farmHit) {
     e._featureHandled = true;
     if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-    _selFarmObjId = nearest.id || null;
+    _selFarmObjId = farmHit.feature.props.OBJECTID;
     farmPolygonTiles.redraw();
-    L.popup()
-      .setLatLng([nearest.y, nearest.x])
-      .setContent(`📍 ${nearest.a}`)
-      .openOn(map);
+    // 最近傍ピンから地番を取得してポップアップ
+    if (farmPinData) {
+      const cosLat = Math.cos(lat * Math.PI / 180);
+      let nearest = null, minDist = Infinity;
+      for (const d of farmPinData) {
+        const dist = (d.y-lat)**2 + ((d.x-lng)*cosLat)**2;
+        if (dist < minDist) { minDist = dist; nearest = d; }
+      }
+      if (nearest && minDist < 0.001 * 0.001) {
+        L.popup().setLatLng([lat, lng]).setContent(`📍 ${nearest.a}`).openOn(map);
+      }
+    }
   }
 });
 
