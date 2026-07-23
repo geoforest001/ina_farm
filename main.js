@@ -85,35 +85,96 @@ fetch('data/farm_pins.json')
     farmPinLayer = L.geoJSON(null, { pointToLayer: () => L.circleMarker([0,0], {radius:0, opacity:0, fillOpacity:0}) });
     farmPinLayer.addTo(map);
   });
-/* 農地筆ポリゴン クリック: queryFeaturesで正確なPIP→ハイライト＋地番ポップアップ */
+/* ─── 地図クリックハンドラ（マンホール→農業施設→農地ポリゴン の優先順で処理）─── */
 map.on('click', function(e) {
-  if (!map.hasLayer(farmPolygonTiles)) return;
-  if (map.getZoom() < 15) return;
   const lat = e.latlng.lat, lng = e.latlng.lng;
+  const cosLat = Math.cos(lat * Math.PI / 180);
 
-  // protomaps queryFeatures でクリック点を含むポリゴンを取得（点内包テスト）
-  var hits = farmPolygonTiles.queryFeatures(lng, lat, map.getZoom(), 0);
-  var farmHit = null;
-  for (var h of hits) { if (h.layerName === '農地筆ポリゴン') { farmHit = h; break; } }
-
-  if (farmHit) {
-    e._featureHandled = true;
-    if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-    _selFarmObjId = farmHit.feature.props.OBJECTID;
-    farmPolygonTiles.redraw();
-    // 最近傍ピンから地番を取得してポップアップ
-    if (farmPinData) {
-      const cosLat = Math.cos(lat * Math.PI / 180);
-      let nearest = null, minDist = Infinity;
-      for (const d of farmPinData) {
-        const dist = (d.y-lat)**2 + ((d.x-lng)*cosLat)**2;
-        if (dist < minDist) { minDist = dist; nearest = d; }
-      }
-      if (nearest && minDist < 0.001 * 0.001) {
-        L.popup().setLatLng([lat, lng]).setContent(`📍 ${nearest.a}`).openOn(map);
-      }
+  // 優先1: マンホール（点フィーチャ、~50m以内）
+  if (manholePinData && map.hasLayer(surveyTiles)) {
+    let nearest = null, minDist = Infinity;
+    for (const d of manholePinData) {
+      const dist = (d.y-lat)**2 + ((d.x-lng)*cosLat)**2;
+      if (dist < minDist) { minDist = dist; nearest = d; }
+    }
+    if (nearest && minDist <= 0.00045 * 0.00045) {
+      _selFarmObjId = null; farmPolygonTiles.redraw();
+      if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+      _selOverlay = L.circleMarker([nearest.y, nearest.x], {
+        radius: 12, color: '#FFD700', weight: 4, fillOpacity: 0
+      }).addTo(map);
+      const rows = [
+        nearest.h ? `<tr><th>配管名</th><td>${nearest.h}</td></tr>` : '',
+        nearest.k ? `<tr><th>種別</th><td>${nearest.k}</td></tr>` : ''
+      ].filter(Boolean).join('');
+      L.popup({ maxWidth: 200 })
+        .setLatLng([nearest.y, nearest.x])
+        .setContent(`<table class="shisetsu-popup">${rows}</table>`)
+        .openOn(map);
+      return;
     }
   }
+
+  // 優先2: 農業施設（点フィーチャ、~80m以内）
+  if (shisetsuPinData && map.hasLayer(shisetsuTiles)) {
+    let nearest = null, minDist = Infinity;
+    for (const d of shisetsuPinData) {
+      const dist = (d.y-lat)**2 + ((d.x-lng)*cosLat)**2;
+      if (dist < minDist) { minDist = dist; nearest = d; }
+    }
+    if (nearest && minDist <= 0.0007 * 0.0007) {
+      _selFarmObjId = null; farmPolygonTiles.redraw();
+      if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+      _selOverlay = L.circleMarker([nearest.y, nearest.x], {
+        radius: 16, color: '#FFD700', weight: 4, fillOpacity: 0
+      }).addTo(map);
+      const rows = [
+        nearest.n ? `<tr><th>施設名</th><td>${nearest.n}</td></tr>` : '',
+        nearest.k ? `<tr><th>施設区分</th><td>${nearest.k}</td></tr>` : '',
+        nearest.m ? `<tr><th>管理団体名</th><td>${nearest.m}</td></tr>` : '',
+        nearest.u ? `<tr><th>用排区分</th><td>${nearest.u}</td></tr>` : '',
+        nearest.b && nearest.b.trim() ? `<tr><th>区間部位</th><td>${nearest.b}</td></tr>` : ''
+      ].filter(Boolean).join('');
+      L.popup({ maxWidth: 240 })
+        .setLatLng([nearest.y, nearest.x])
+        .setContent(`<table class="shisetsu-popup">${rows}</table>`)
+        .openOn(map);
+      return;
+    }
+  }
+
+  // 優先3: 農地筆ポリゴン（面フィーチャ、点内包テスト）
+  if (map.hasLayer(farmPolygonTiles) && map.getZoom() >= 15) {
+    // queryTileFeaturesDebug(lng, lat, radius) → Map<viewName, features[]>
+    var resultsMap = farmPolygonTiles.queryTileFeaturesDebug(lng, lat, 0);
+    var farmHit = null;
+    for (var [, features] of resultsMap) {
+      for (var f of features) {
+        if (f.layerName === '農地筆ポリゴン') { farmHit = f; break; }
+      }
+      if (farmHit) break;
+    }
+    if (farmHit) {
+      if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+      _selFarmObjId = farmHit.feature.props.OBJECTID;
+      farmPolygonTiles.redraw();
+      if (farmPinData) {
+        let nearest = null, minDist = Infinity;
+        for (const d of farmPinData) {
+          const dist = (d.y-lat)**2 + ((d.x-lng)*cosLat)**2;
+          if (dist < minDist) { minDist = dist; nearest = d; }
+        }
+        if (nearest && minDist < 0.001 * 0.001) {
+          L.popup().setLatLng([lat, lng]).setContent(`📍 ${nearest.a}`).openOn(map);
+        }
+      }
+      return;
+    }
+  }
+
+  // 何もヒットしなかった: 全選択クリア
+  if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+  if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
 });
 
 
@@ -266,81 +327,16 @@ const shisetsuTiles = protomapsL.leafletLayer({
 });
 shisetsuTiles.addTo(map);
 
-/* マンホールクリックポップアップ */
+/* マンホール・農業施設のピンデータ取得 */
 let manholePinData = null;
 fetch('data/manhole_pins.json')
   .then(r => r.json())
   .then(data => { manholePinData = data; });
 
-map.on('click', function(e) {
-  if (!manholePinData || !map.hasLayer(surveyTiles)) return;
-  const lat = e.latlng.lat, lng = e.latlng.lng;
-  const cosLat = Math.cos(lat * Math.PI / 180);
-  let nearest = null, minDist = Infinity;
-  for (const d of manholePinData) {
-    const dl = d.y - lat, dn = (d.x - lng) * cosLat;
-    const dist = dl * dl + dn * dn;
-    if (dist < minDist) { minDist = dist; nearest = d; }
-  }
-  if (!nearest || minDist > 0.00045 * 0.00045) return;
-  e._featureHandled = true;
-  _selFarmObjId = null; farmPolygonTiles.redraw();
-  if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-  _selOverlay = L.circleMarker([nearest.y, nearest.x], {
-    radius: 12, color: '#FFD700', weight: 4, fillOpacity: 0
-  }).addTo(map);
-  const rows = [
-    nearest.h ? `<tr><th>配管名</th><td>${nearest.h}</td></tr>` : '',
-    nearest.k ? `<tr><th>種別</th><td>${nearest.k}</td></tr>` : ''
-  ].filter(Boolean).join('');
-  L.popup({ maxWidth: 200 })
-    .setLatLng([nearest.y, nearest.x])
-    .setContent(`<table class="shisetsu-popup">${rows}</table>`)
-    .openOn(map);
-});
-
-/* 点施設クリックポップアップ */
 let shisetsuPinData = null;
 fetch('data/shisetsu_pins.json')
   .then(r => r.json())
   .then(data => { shisetsuPinData = data; });
-
-map.on('click', function(e) {
-  if (!shisetsuPinData || !map.hasLayer(shisetsuTiles)) return;
-  const lat = e.latlng.lat, lng = e.latlng.lng;
-  const cosLat = Math.cos(lat * Math.PI / 180);
-  let nearest = null, minDist = Infinity;
-  for (const d of shisetsuPinData) {
-    const dl = d.y - lat, dn = (d.x - lng) * cosLat;
-    const dist = dl * dl + dn * dn;
-    if (dist < minDist) { minDist = dist; nearest = d; }
-  }
-  if (!nearest || minDist > 0.0007 * 0.0007) return;
-  e._featureHandled = true;
-  _selFarmObjId = null; farmPolygonTiles.redraw();
-  if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-  _selOverlay = L.circleMarker([nearest.y, nearest.x], {
-    radius: 16, color: '#FFD700', weight: 4, fillOpacity: 0
-  }).addTo(map);
-  const rows = [
-    nearest.n ? `<tr><th>施設名</th><td>${nearest.n}</td></tr>` : '',
-    nearest.k ? `<tr><th>施設区分</th><td>${nearest.k}</td></tr>` : '',
-    nearest.m ? `<tr><th>管理団体名</th><td>${nearest.m}</td></tr>` : '',
-    nearest.u ? `<tr><th>用排区分</th><td>${nearest.u}</td></tr>` : '',
-    nearest.b && nearest.b.trim() ? `<tr><th>区間部位</th><td>${nearest.b}</td></tr>` : ''
-  ].filter(Boolean).join('');
-  L.popup({ maxWidth: 240 })
-    .setLatLng([nearest.y, nearest.x])
-    .setContent(`<table class="shisetsu-popup">${rows}</table>`)
-    .openOn(map);
-});
-
-/* マップ空白クリック時に全ハイライトをクリア */
-map.on('click', function(e) {
-  if (e._featureHandled) return;
-  if (_selOverlay)      { map.removeLayer(_selOverlay); _selOverlay = null; }
-  if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
-});
 
 const baseLayers = {};
 
