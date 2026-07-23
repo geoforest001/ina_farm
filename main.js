@@ -323,6 +323,29 @@ function renderLayerControl() {
   });
   layerControl.addTo(map);
 
+  // 農地レイヤ凡例の注入（checkbox + span をlgnd-rowでラップ＋凡例div追加）
+  var LGND_DEFS = {
+    '農地筆ポリゴン': '<span class="lgnd-swatch lgnd-poly" style="background:rgba(240,210,0,0.35);border:1.5px solid rgb(160,130,0)"></span><span class="lgnd-text">農地の区画ポリゴン</span>',
+    '農業施設':       '<span class="lgnd-swatch lgnd-dblcircle" style="color:#e00"></span><span class="lgnd-text">農業施設（ポンプ場・水門等）</span>',
+    '開水路':         '<span class="lgnd-swatch lgnd-line" style="background:rgb(0,150,255)"></span><span class="lgnd-text">開水路</span>',
+    'パイプライン':   '<span class="lgnd-swatch lgnd-line" style="background:rgb(0,80,200)"></span><span class="lgnd-text">パイプライン</span>',
+    'マンホール':     '<span class="lgnd-swatch lgnd-sq" style="background:#2196F3"></span><span class="lgnd-text">排泥処理工</span><span class="lgnd-swatch lgnd-sq" style="background:#f44336"></span><span class="lgnd-text">制水弁</span><span class="lgnd-swatch lgnd-circle-sm" style="background:white"></span><span class="lgnd-text">その他</span>'
+  };
+  document.querySelectorAll('.leaflet-control-layers-overlays label').forEach(function(label) {
+    var span = label.querySelector('span');
+    if (!span) return;
+    var name = span.textContent.trim();
+    if (!LGND_DEFS[name]) return;
+    var row = document.createElement('div');
+    row.className = 'lgnd-row';
+    Array.from(label.childNodes).forEach(function(n) { row.appendChild(n); });
+    label.appendChild(row);
+    var lgnd = document.createElement('div');
+    lgnd.className = 'layer-legend';
+    lgnd.innerHTML = LGND_DEFS[name];
+    label.appendChild(lgnd);
+  });
+
   var panel = document.querySelector('.leaflet-control-layers');
   if (!panel) return;
 
