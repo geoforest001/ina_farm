@@ -43,6 +43,10 @@ naganoCsMap.addTo(map); naganoCsMap.setOpacity(0);
 const FARM_POLYGON_URL = "https://geoforest001.github.io/ina_farm/data/farm_polygon.pmtiles";
 const PIPELINE_URL = "https://geoforest001.github.io/ina_farm/data/pipeline.pmtiles";
 
+// 選択中フィーチャのハイライト状態
+var _selFarmObjId = null;
+var _selOverlay = null;  // 点・線レイヤ用 Leaflet オーバーレイ
+
 const farmPolygonTiles = protomapsL.leafletLayer({
   url: FARM_POLYGON_URL,
   maxDataZoom: 16,
@@ -54,6 +58,16 @@ const farmPolygonTiles = protomapsL.leafletLayer({
         opacity: 0.3,
         stroke: "rgb(160,130,0)",
         width: 1.5
+      })
+    },
+    {
+      dataLayer: "農地筆ポリゴン",
+      filter: (zoom, feature) => feature.props.OBJECTID === _selFarmObjId,
+      symbolizer: new protomapsL.PolygonSymbolizer({
+        fill: "rgba(255,220,0,0.45)",
+        opacity: 1,
+        stroke: "#FFD700",
+        width: 5
       })
     }
   ],
@@ -71,9 +85,10 @@ fetch('data/farm_pins.json')
     farmPinLayer = L.geoJSON(null, { pointToLayer: () => L.circleMarker([0,0], {radius:0, opacity:0, fillOpacity:0}) });
     farmPinLayer.addTo(map);
   });
-/* 農地筆ポリゴン クリックで地番ポップアップ */
+/* 農地筆ポリゴン クリック: ハイライト＋地番ポップアップ */
 map.on('click', function(e) {
   if (!farmPinData || map.getZoom() < 15) return;
+  if (!map.hasLayer(farmPolygonTiles)) return;
   const lat = e.latlng.lat;
   const lng = e.latlng.lng;
   const cosLat = Math.cos(lat * Math.PI / 180);
@@ -84,8 +99,11 @@ map.on('click', function(e) {
     const dist = dlat * dlat + dlng * dlng;
     if (dist < minDist) { minDist = dist; nearest = d; }
   }
-  /* 約50m以内（0.00045度²）のみ表示 */
   if (nearest && minDist < 0.00045 * 0.00045) {
+    e._featureHandled = true;
+    if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+    _selFarmObjId = nearest.id || null;
+    farmPolygonTiles.redraw();
     L.popup()
       .setLatLng([nearest.y, nearest.x])
       .setContent(`📍 ${nearest.a}`)
@@ -259,8 +277,13 @@ map.on('click', function(e) {
     const dist = dl * dl + dn * dn;
     if (dist < minDist) { minDist = dist; nearest = d; }
   }
-  // 約50m以内のみ表示
   if (!nearest || minDist > 0.00045 * 0.00045) return;
+  e._featureHandled = true;
+  _selFarmObjId = null; farmPolygonTiles.redraw();
+  if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+  _selOverlay = L.circleMarker([nearest.y, nearest.x], {
+    radius: 12, color: '#FFD700', weight: 4, fillOpacity: 0
+  }).addTo(map);
   const rows = [
     nearest.h ? `<tr><th>配管名</th><td>${nearest.h}</td></tr>` : '',
     nearest.k ? `<tr><th>種別</th><td>${nearest.k}</td></tr>` : ''
@@ -287,8 +310,13 @@ map.on('click', function(e) {
     const dist = dl * dl + dn * dn;
     if (dist < minDist) { minDist = dist; nearest = d; }
   }
-  // 約80m以内のみ表示
   if (!nearest || minDist > 0.0007 * 0.0007) return;
+  e._featureHandled = true;
+  _selFarmObjId = null; farmPolygonTiles.redraw();
+  if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+  _selOverlay = L.circleMarker([nearest.y, nearest.x], {
+    radius: 16, color: '#FFD700', weight: 4, fillOpacity: 0
+  }).addTo(map);
   const rows = [
     nearest.n ? `<tr><th>施設名</th><td>${nearest.n}</td></tr>` : '',
     nearest.k ? `<tr><th>施設区分</th><td>${nearest.k}</td></tr>` : '',
@@ -300,6 +328,13 @@ map.on('click', function(e) {
     .setLatLng([nearest.y, nearest.x])
     .setContent(`<table class="shisetsu-popup">${rows}</table>`)
     .openOn(map);
+});
+
+/* マップ空白クリック時に全ハイライトをクリア */
+map.on('click', function(e) {
+  if (e._featureHandled) return;
+  if (_selOverlay)      { map.removeLayer(_selOverlay); _selOverlay = null; }
+  if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
 });
 
 const baseLayers = {};
