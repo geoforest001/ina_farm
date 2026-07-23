@@ -45,25 +45,20 @@ const PIPELINE_URL = "https://geoforest001.github.io/ina_farm/data/pipeline.pmti
 
 // 選択中フィーチャのハイライト状態
 var _selFarmObjId = null;
-var _selOverlay = null;  // 点・線レイヤ用 Leaflet オーバーレイ
+var _selWaterwayId = null;
+var _selPipelineId = null;
+var _selOverlay = null;  // 点フィーチャ用 Leaflet オーバーレイ
 
-// 点→線分の距離（度単位、cosLat補正済み）
-function ptSegDist(px, py, x1, y1, x2, y2) {
-  const dx = x2-x1, dy = y2-y1;
-  const lenSq = dx*dx + dy*dy;
-  if (lenSq < 1e-18) return Math.hypot(px-x1, py-y1);
-  const t = Math.max(0, Math.min(1, ((px-x1)*dx + (py-y1)*dy) / lenSq));
-  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
-}
-function distToPolyline(lng, lat, coords, cosLat) {
-  // coords: [[lng, lat], ...]
-  let minD = Infinity;
-  for (let i = 0; i < coords.length-1; i++) {
-    const [x1, y1] = coords[i], [x2, y2] = coords[i+1];
-    const d = ptSegDist((lng-x1)*cosLat, lat-y1, 0, 0, (x2-x1)*cosLat, y2-y1);
-    if (d < minD) minD = d;
+// フィーチャの代表点群への最短距離
+function minDistToFeat(lng, lat, feat, cosLat) {
+  let d = Math.hypot((feat.x-lng)*cosLat, feat.y-lat);
+  if (feat.pts) {
+    for (const p of feat.pts) {
+      const dp = Math.hypot((p[0]-lng)*cosLat, p[1]-lat);
+      if (dp < d) d = dp;
+    }
   }
-  return minD;
+  return d;
 }
 
 const farmPolygonTiles = protomapsL.leafletLayer({
@@ -162,20 +157,20 @@ map.on('click', function(e) {
     }
   }
 
-  // 優先3: 開水路（線フィーチャ、~22m以内）
-  const LINE_THRESH = 0.0002;
+  // 優先3: 開水路（protomaps第2ペイントルールでハイライト）
+  const LINE_THRESH = 0.0002;  // ~22m
   if (suiroLineData && map.hasLayer(waterwayTiles)) {
     let nearest = null, minDist = Infinity;
     for (const d of suiroLineData) {
-      const dist = distToPolyline(lng, lat, d.c, cosLat);
+      const dist = minDistToFeat(lng, lat, d, cosLat);
       if (dist < minDist) { minDist = dist; nearest = d; }
     }
     if (nearest && minDist <= LINE_THRESH) {
-      _selFarmObjId = null; farmPolygonTiles.redraw();
       if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-      _selOverlay = L.polyline(nearest.c.map(c => [c[1], c[0]]), {
-        color: '#FFD700', weight: 5, opacity: 0.9, interactive: false
-      }).addTo(map);
+      if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
+      if (_selPipelineId !== null) { _selPipelineId = null; pipelineTiles.redraw(); }
+      _selWaterwayId = nearest.id;
+      waterwayTiles.redraw();
       const lenRow = nearest.len > 0 ? `<tr><th>延長</th><td>${nearest.len} m</td></tr>` : '';
       L.popup({ maxWidth: 220 })
         .setLatLng([lat, lng])
@@ -185,19 +180,19 @@ map.on('click', function(e) {
     }
   }
 
-  // 優先4: パイプライン（線フィーチャ、~22m以内）
+  // 優先4: パイプライン（protomaps第2ペイントルールでハイライト）
   if (pipelineLineData && map.hasLayer(pipelineTiles)) {
     let nearest = null, minDist = Infinity;
     for (const d of pipelineLineData) {
-      const dist = distToPolyline(lng, lat, d.c, cosLat);
+      const dist = minDistToFeat(lng, lat, d, cosLat);
       if (dist < minDist) { minDist = dist; nearest = d; }
     }
     if (nearest && minDist <= LINE_THRESH) {
-      _selFarmObjId = null; farmPolygonTiles.redraw();
       if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-      _selOverlay = L.polyline(nearest.c.map(c => [c[1], c[0]]), {
-        color: '#FFD700', weight: 5, opacity: 0.9, interactive: false
-      }).addTo(map);
+      if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
+      if (_selWaterwayId !== null) { _selWaterwayId = null; waterwayTiles.redraw(); }
+      _selPipelineId = nearest.id;
+      pipelineTiles.redraw();
       const rows = [
         nearest.id   ? `<tr><th>名称</th><td>${nearest.id}</td></tr>` : '',
         nearest.spec ? `<tr><th>規格</th><td>${nearest.spec}</td></tr>` : ''
@@ -241,7 +236,9 @@ map.on('click', function(e) {
 
   // 何もヒットしなかった: 全選択クリア
   if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
-  if (_selFarmObjId !== null) { _selFarmObjId = null; farmPolygonTiles.redraw(); }
+  if (_selFarmObjId !== null)   { _selFarmObjId = null;   farmPolygonTiles.redraw(); }
+  if (_selWaterwayId !== null)  { _selWaterwayId = null;  waterwayTiles.redraw(); }
+  if (_selPipelineId !== null)  { _selPipelineId = null;  pipelineTiles.redraw(); }
 });
 
 
@@ -251,10 +248,12 @@ const pipelineTiles = protomapsL.leafletLayer({
   paintRules: [
     {
       dataLayer: "02パイプライン_Layer",
-      symbolizer: new protomapsL.LineSymbolizer({
-        color: "rgb(0,80,200)",
-        width: 2.5
-      })
+      symbolizer: new protomapsL.LineSymbolizer({ color: "rgb(0,80,200)", width: 2.5 })
+    },
+    {
+      dataLayer: "02パイプライン_Layer",
+      filter: (zoom, feature) => feature.props['名称'] === _selPipelineId,
+      symbolizer: new protomapsL.LineSymbolizer({ color: "#FFD700", width: 6 })
     }
   ],
   labelRules: []
@@ -267,10 +266,12 @@ const waterwayTiles = protomapsL.leafletLayer({
   paintRules: [
     {
       dataLayer: "水路",
-      symbolizer: new protomapsL.LineSymbolizer({
-        color: "rgb(0,150,255)",
-        width: 2
-      })
+      symbolizer: new protomapsL.LineSymbolizer({ color: "rgb(0,150,255)", width: 2 })
+    },
+    {
+      dataLayer: "水路",
+      filter: (zoom, feature) => feature.props.OBJECTID === _selWaterwayId,
+      symbolizer: new protomapsL.LineSymbolizer({ color: "#FFD700", width: 5 })
     }
   ],
   labelRules: []
