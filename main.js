@@ -47,6 +47,25 @@ const PIPELINE_URL = "https://geoforest001.github.io/ina_farm/data/pipeline.pmti
 var _selFarmObjId = null;
 var _selOverlay = null;  // 点・線レイヤ用 Leaflet オーバーレイ
 
+// 点→線分の距離（度単位、cosLat補正済み）
+function ptSegDist(px, py, x1, y1, x2, y2) {
+  const dx = x2-x1, dy = y2-y1;
+  const lenSq = dx*dx + dy*dy;
+  if (lenSq < 1e-18) return Math.hypot(px-x1, py-y1);
+  const t = Math.max(0, Math.min(1, ((px-x1)*dx + (py-y1)*dy) / lenSq));
+  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy));
+}
+function distToPolyline(lng, lat, coords, cosLat) {
+  // coords: [[lng, lat], ...]
+  let minD = Infinity;
+  for (let i = 0; i < coords.length-1; i++) {
+    const [x1, y1] = coords[i], [x2, y2] = coords[i+1];
+    const d = ptSegDist((lng-x1)*cosLat, lat-y1, 0, 0, (x2-x1)*cosLat, y2-y1);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
 const farmPolygonTiles = protomapsL.leafletLayer({
   url: FARM_POLYGON_URL,
   maxDataZoom: 16,
@@ -143,7 +162,55 @@ map.on('click', function(e) {
     }
   }
 
-  // 優先3: 農地筆ポリゴン（面フィーチャ、点内包テスト）
+  // 優先3: 開水路（線フィーチャ、~22m以内）
+  const LINE_THRESH = 0.0002;
+  if (suiroLineData && map.hasLayer(waterwayTiles)) {
+    let nearest = null, minDist = Infinity;
+    for (const d of suiroLineData) {
+      const dist = distToPolyline(lng, lat, d.c, cosLat);
+      if (dist < minDist) { minDist = dist; nearest = d; }
+    }
+    if (nearest && minDist <= LINE_THRESH) {
+      _selFarmObjId = null; farmPolygonTiles.redraw();
+      if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+      _selOverlay = L.polyline(nearest.c.map(c => [c[1], c[0]]), {
+        color: '#FFD700', weight: 5, opacity: 0.9, interactive: false
+      }).addTo(map);
+      const lenRow = nearest.len > 0 ? `<tr><th>延長</th><td>${nearest.len} m</td></tr>` : '';
+      L.popup({ maxWidth: 220 })
+        .setLatLng([lat, lng])
+        .setContent(`<table class="shisetsu-popup"><tr><th>水路ID</th><td>${nearest.id}</td></tr>${lenRow}</table>`)
+        .openOn(map);
+      return;
+    }
+  }
+
+  // 優先4: パイプライン（線フィーチャ、~22m以内）
+  if (pipelineLineData && map.hasLayer(pipelineTiles)) {
+    let nearest = null, minDist = Infinity;
+    for (const d of pipelineLineData) {
+      const dist = distToPolyline(lng, lat, d.c, cosLat);
+      if (dist < minDist) { minDist = dist; nearest = d; }
+    }
+    if (nearest && minDist <= LINE_THRESH) {
+      _selFarmObjId = null; farmPolygonTiles.redraw();
+      if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
+      _selOverlay = L.polyline(nearest.c.map(c => [c[1], c[0]]), {
+        color: '#FFD700', weight: 5, opacity: 0.9, interactive: false
+      }).addTo(map);
+      const rows = [
+        nearest.id   ? `<tr><th>名称</th><td>${nearest.id}</td></tr>` : '',
+        nearest.spec ? `<tr><th>規格</th><td>${nearest.spec}</td></tr>` : ''
+      ].filter(Boolean).join('');
+      L.popup({ maxWidth: 220 })
+        .setLatLng([lat, lng])
+        .setContent(`<table class="shisetsu-popup">${rows}</table>`)
+        .openOn(map);
+      return;
+    }
+  }
+
+  // 優先5: 農地筆ポリゴン（面フィーチャ、点内包テスト）
   if (map.hasLayer(farmPolygonTiles) && map.getZoom() >= 15) {
     // queryTileFeaturesDebug(lng, lat, radius) → Map<viewName, features[]>
     var resultsMap = farmPolygonTiles.queryTileFeaturesDebug(lng, lat, 0);
@@ -327,16 +394,18 @@ const shisetsuTiles = protomapsL.leafletLayer({
 });
 shisetsuTiles.addTo(map);
 
-/* マンホール・農業施設のピンデータ取得 */
+/* 各レイヤのクリック検出用データ取得 */
 let manholePinData = null;
-fetch('data/manhole_pins.json')
-  .then(r => r.json())
-  .then(data => { manholePinData = data; });
+fetch('data/manhole_pins.json').then(r => r.json()).then(d => { manholePinData = d; });
 
 let shisetsuPinData = null;
-fetch('data/shisetsu_pins.json')
-  .then(r => r.json())
-  .then(data => { shisetsuPinData = data; });
+fetch('data/shisetsu_pins.json').then(r => r.json()).then(d => { shisetsuPinData = d; });
+
+let suiroLineData = null;
+fetch('data/suiro_lines.json').then(r => r.json()).then(d => { suiroLineData = d; });
+
+let pipelineLineData = null;
+fetch('data/pipeline_lines.json').then(r => r.json()).then(d => { pipelineLineData = d; });
 
 const baseLayers = {};
 
