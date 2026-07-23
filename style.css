@@ -206,8 +206,26 @@ body {
   flex-shrink: 0;
 }
 .wx-chk-item .ico { font-size: 13px; }
-.wx-chk-item.active { background: #eef4ff; border-color: #0066ff; color: #0044cc; }
+.wx-chk-item.active,
+.wx-chk-item:has(input:checked) { background: #eef4ff; border-color: #4488dd; color: #1a5fa0; font-weight: 600; }
 .wx-chk-item:hover  { background: #f0f4ff; }
+
+/* ─── アクティブレイヤ ハイライト ─── */
+/* Leaflet ネイティブ label（農地レイヤ・ベースマップ・ダッシュボード） */
+.leaflet-control-layers label:has(input:checked) {
+  background: rgba(45, 125, 210, 0.1);
+  border-radius: 5px;
+  color: #1a5fa0;
+  font-weight: 600;
+  padding-left: 4px;
+  padding-right: 4px;
+  margin-left: -4px;
+}
+/* 期間合計降水量チェックボックス */
+.prec-chk-label:has(input:checked) {
+  color: #1e7e34;
+  font-weight: 600;
+}
 
 /* セクション見出し */
 .wx-section-label {
