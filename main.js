@@ -95,9 +95,9 @@ const farmPolygonTiles = protomapsL.leafletLayer({
       dataLayer: "農地筆ポリゴン",
       filter: (zoom, feature) => feature.props.OBJECTID === _selFarmObjId,
       symbolizer: new protomapsL.PolygonSymbolizer({
-        fill: "rgba(255,220,0,0.45)",
+        fill: "rgba(255,34,0,0.45)",
         opacity: 1,
-        stroke: "#FFD700",
+        stroke: "#FF2200",
         width: 5
       })
     }
@@ -132,7 +132,7 @@ map.on('click', function(e) {
       _selFarmObjId = null; farmPolygonTiles.redraw();
       if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
       _selOverlay = L.circleMarker([nearest.y, nearest.x], {
-        radius: 12, color: '#FFD700', weight: 4, fillOpacity: 0
+        radius: 12, color: '#FF2200', weight: 4, fillOpacity: 0
       }).addTo(map);
       const rows = [
         nearest.h ? `<tr><th>配管名</th><td>${nearest.h}</td></tr>` : '',
@@ -157,7 +157,7 @@ map.on('click', function(e) {
       _selFarmObjId = null; farmPolygonTiles.redraw();
       if (_selOverlay) { map.removeLayer(_selOverlay); _selOverlay = null; }
       _selOverlay = L.circleMarker([nearest.y, nearest.x], {
-        radius: 16, color: '#FFD700', weight: 4, fillOpacity: 0
+        radius: 16, color: '#FF2200', weight: 4, fillOpacity: 0
       }).addTo(map);
       const rows = [
         nearest.n ? `<tr><th>施設名</th><td>${nearest.n}</td></tr>` : '',
@@ -270,7 +270,7 @@ const pipelineTiles = protomapsL.leafletLayer({
     {
       dataLayer: "02パイプライン_Layer",
       filter: (zoom, feature) => feature.props['名称'] === _selPipelineId,
-      symbolizer: new protomapsL.LineSymbolizer({ color: "#FFD700", width: 6 })
+      symbolizer: new protomapsL.LineSymbolizer({ color: "#FF2200", width: 6 })
     }
   ],
   labelRules: []
@@ -288,7 +288,7 @@ const waterwayTiles = protomapsL.leafletLayer({
     {
       dataLayer: "水路",
       filter: (zoom, feature) => feature.props.OBJECTID === _selWaterwayId,
-      symbolizer: new protomapsL.LineSymbolizer({ color: "#FFD700", width: 5 })
+      symbolizer: new protomapsL.LineSymbolizer({ color: "#FF2200", width: 5 })
     }
   ],
   labelRules: []
