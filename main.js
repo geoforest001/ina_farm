@@ -49,13 +49,30 @@ var _selWaterwayId = null;
 var _selPipelineId = null;
 var _selOverlay = null;  // 点フィーチャ用 Leaflet オーバーレイ
 
-// フィーチャの代表点群への最短距離
+// 点Pから線分AB(cos補正座標)への最短距離
+function ptSegDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// セグメント配列への最短距離（点→線分距離）
 function minDistToFeat(lng, lat, feat, cosLat) {
-  let d = Math.hypot((feat.x-lng)*cosLat, feat.y-lat);
-  if (feat.pts) {
-    for (const p of feat.pts) {
-      const dp = Math.hypot((p[0]-lng)*cosLat, p[1]-lat);
-      if (dp < d) d = dp;
+  const cx = (lng - feat.x) * cosLat, cy = lat - feat.y;
+  let d = Math.hypot(cx, cy);
+  if (feat.segs) {
+    for (const seg of feat.segs) {
+      for (let i = 0; i < seg.length - 1; i++) {
+        const [x1, y1] = seg[i], [x2, y2] = seg[i + 1];
+        const dd = ptSegDist(
+          (lng - x1) * cosLat, lat - y1,
+          0, 0,
+          (x2 - x1) * cosLat, y2 - y1
+        );
+        if (dd < d) d = dd;
+      }
     }
   }
   return d;
@@ -158,7 +175,7 @@ map.on('click', function(e) {
   }
 
   // 優先3: 開水路（protomaps第2ペイントルールでハイライト）
-  const LINE_THRESH = 0.0002;  // ~22m
+  const LINE_THRESH = 0.0003;  // ~33m (線分距離なのでこれで十分)
   if (suiroLineData && map.hasLayer(waterwayTiles)) {
     let nearest = null, minDist = Infinity;
     for (const d of suiroLineData) {
